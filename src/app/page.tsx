@@ -21,6 +21,7 @@ interface Project {
 // Trigger Vercel Deploy: Env Vars Added
   repo_name: string;
   deployment_url: string;
+  // Environment Variable Fix: VERCEL_ACCESS_TOKEN
   status: string;
 }
 
