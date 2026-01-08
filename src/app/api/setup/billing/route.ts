@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!; 
-// Note: In production, use SERVICE_ROLE_KEY for admin tasks
-const supabase = createClient(supabaseUrl, supabaseKey);
-
 export async function GET() {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json({ message: "Billing setup disabled: missing Supabase env." });
+    }
+    const supabase = createClient(supabaseUrl, supabaseKey);
     // 1. Create Subscriptions Table if not exists
     const { error } = await supabase.rpc('create_subscriptions_table');
     
