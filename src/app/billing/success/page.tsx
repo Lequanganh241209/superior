@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
-export default function BillingSuccess() {
+function Content() {
   const search = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState<"verifying" | "success" | "failed">("verifying");
@@ -64,3 +64,10 @@ export default function BillingSuccess() {
   );
 }
 
+export default function BillingSuccess() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black text-white">Loading...</div>}>
+      <Content />
+    </Suspense>
+  );
+}
