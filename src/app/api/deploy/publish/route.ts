@@ -16,24 +16,48 @@ export async function POST(req: NextRequest) {
       NEXT_PUBLIC_SUPABASE_URL: providedEnvs.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: providedEnvs.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
       SUPABASE_SERVICE_ROLE_KEY: providedEnvs.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "",
-      OPENAI_API_KEY: providedEnvs.OPENAI_API_KEY || process.env.OPENAI_API_KEY || ""
+      OPENAI_API_KEY: providedEnvs.OPENAI_API_KEY || process.env.OPENAI_API_KEY || "",
+      ...(providedEnvs.VERCEL_ACCESS_TOKEN ? { VERCEL_ACCESS_TOKEN: providedEnvs.VERCEL_ACCESS_TOKEN } : {})
     };
 
-    try {
-      await setProjectEnv(name, envs, accessToken);
-    } catch {}
+    const results = {
+              env: false,
+              protection: false,
+              alias: false,
+              errors: [] as string[]
+            };
 
-    try {
-      await disableDeploymentProtection(name, accessToken);
-    } catch {}
+            try {
+              await setProjectEnv(name, envs, accessToken);
+              results.env = true;
+            } catch (e: any) {
+              console.error("Env error:", e);
+              results.errors.push(`Env: ${e.message}`);
+            }
 
-    await bindCanonicalAlias(name, accessToken);
+            try {
+              await disableDeploymentProtection(name, accessToken);
+              results.protection = true;
+            } catch (e: any) {
+              console.error("Protection error:", e);
+              results.errors.push(`Protection: ${e.message}`);
+            }
 
-    return NextResponse.json({
-      success: true,
-      url: `https://${name}.vercel.app`
-    });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Internal Error" }, { status: 500 });
-  }
+            try {
+              await bindCanonicalAlias(name, accessToken);
+              results.alias = true;
+            } catch (e: any) {
+              console.error("Alias error:", e);
+              results.errors.push(`Alias: ${e.message}`);
+            }
+
+            return NextResponse.json({
+              success: true, // Return true even if partial failures, so client doesn't crash
+              url: `https://${name}.vercel.app`,
+              details: results
+            });
+          } catch (error: any) {
+            console.error("Publish handler error:", error);
+            return NextResponse.json({ error: error.message || "Internal Error" }, { status: 500 });
+          }
 }
