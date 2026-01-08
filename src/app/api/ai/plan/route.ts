@@ -2,11 +2,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-// Init OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export const maxDuration = 60; // Set max duration for Vercel Function
 
 export async function POST(req: Request) {
@@ -41,6 +36,7 @@ CREATE TABLE users (
         });
     }
 
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const systemPrompt = `
     You are an Expert Software Architect. Analyze the user's project idea and output a JSON object with:
     1. "sql": A valid PostgreSQL migration script (CREATE TABLEs, RLS policies, Relations).

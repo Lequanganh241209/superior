@@ -63,11 +63,11 @@ export async function GET(req: NextRequest) {
 
             if (history && history.length > 0) {
                 evolutionStats.total = history.length;
-                evolutionStats.pending = history.filter(h => h.status === 'pending').length;
+                evolutionStats.pending = history.filter((h: any) => h.status === 'pending').length;
                 evolutionStats.last_active = history[0].created_at;
 
                 // Create proposals from pending items
-                history.filter(h => h.status === 'pending').forEach(h => {
+                history.filter((h: any) => h.status === 'pending').forEach((h: any) => {
                     proposals.push({
                         type: 'scale',
                         title: 'Pending Evolution',

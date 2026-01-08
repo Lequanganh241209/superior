@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createDeployment } from "@/lib/vercel/service";
+import { createDeployment, setProjectEnv } from "@/lib/vercel/service";
 import { ContextOracle } from "@/lib/oracle/service";
+import fs from "fs";
+import path from "path";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, repoId, repoName, files } = body;
+    const { name, repoId, repoName, files, useWorkspace } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -14,11 +16,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const workspaceFiles: { path: string; content: string }[] = [];
+    if (!files && useWorkspace) {
+      const base = process.cwd();
+      const includeExt = new Set([".js", ".ts", ".tsx", ".json", ".css", ".md", ".sql", ".svg"]);
+      const ignoreDirs = new Set(["node_modules", ".next", ".git", ".vercel"]);
+      const ignoreFiles = [/^\.env/i, /^\.DS_Store$/i];
+      const walk = (dir: string) => {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const e of entries) {
+          if (ignoreDirs.has(e.name)) continue;
+          const full = path.join(dir, e.name);
+          if (e.isDirectory()) {
+            walk(full);
+          } else {
+            if (ignoreFiles.some(rx => rx.test(e.name))) continue;
+            const ext = path.extname(e.name).toLowerCase();
+            if (!includeExt.has(ext)) continue;
+            const rel = path.relative(base, full).replace(/\\/g, "/");
+            const content = fs.readFileSync(full, "utf-8");
+            workspaceFiles.push({ path: rel, content });
+          }
+        }
+      };
+      walk(base);
+    }
+
     const deployResult = await createDeployment({
       name: name.toLowerCase().replace(/\s+/g, "-"),
       repoId,
       repoName,
-      files // Pass files if available
+      files: files || workspaceFiles
     });
 
     if (!deployResult.success) {
@@ -27,6 +55,16 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+    
+    try {
+      const envs: Record<string, string> = {
+        NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || ""
+      };
+      await setProjectEnv((deployResult as any).projectName || name.toLowerCase().replace(/\s+/g, "-"), envs);
+    } catch {}
 
     // V2 Upgrade: Save Metadata to Context Oracle
     // In a real scenario, we would parse the actual project structure here.

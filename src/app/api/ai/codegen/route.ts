@@ -2,10 +2,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
@@ -27,6 +23,7 @@ export async function POST(req: Request) {
          });
     }
 
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const systemPrompt = `
     You are an Elite Senior Full-Stack Architect and UI/UX Designer.
     Your mission is to generate a PRODUCTION-READY, DEPLOYABLE Next.js 14 Application based on the User's Prompt and the Architect's Plan.

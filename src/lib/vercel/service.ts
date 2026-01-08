@@ -151,3 +151,50 @@ async function deployWithFiles(projectName: string, files: { path: string; conte
          return { success: false, error: error.message };
     }
 }
+
+export async function setProjectEnv(projectName: string, envs: Record<string, string>) {
+  const token = process.env.VERCEL_ACCESS_TOKEN;
+  if (!token) throw new Error("VERCEL_ACCESS_TOKEN is missing");
+  const projRes = await fetch(`${VERCEL_API_URL}/v9/projects/${projectName}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!projRes.ok) throw new Error("Project not found");
+  const proj = await projRes.json();
+  const listRes = await fetch(`${VERCEL_API_URL}/v9/projects/${proj.id}/env`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const existing = listRes.ok ? await listRes.json() : { envs: [] };
+  const map: Record<string, any> = {};
+  for (const e of existing.envs || []) {
+    map[e.key] = e;
+  }
+  for (const [key, value] of Object.entries(envs)) {
+    if (!value) continue;
+    const payload = {
+      key,
+      value,
+      target: ["production", "preview"]
+    };
+    if (map[key]) {
+      const envId = map[key].id;
+      await fetch(`${VERCEL_API_URL}/v9/projects/${proj.id}/env/${envId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ value, target: ["production", "preview"] })
+      });
+    } else {
+      await fetch(`${VERCEL_API_URL}/v9/projects/${proj.id}/env`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+  }
+  return true;
+}

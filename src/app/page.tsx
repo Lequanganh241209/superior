@@ -113,7 +113,7 @@ export default function Dashboard() {
 
     checkUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
           setUser(session?.user);
           setHasSession(true);

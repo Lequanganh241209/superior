@@ -29,8 +29,8 @@ export async function POST(req: Request) {
     
     if (!repoResult.success) throw new Error(repoResult.error);
     
-    const repoUrl = repoResult.url;
-    const parts = repoUrl.replace("https://github.com/", "").split("/");
+    const repoUrl = repoResult.url || "";
+    const parts = repoUrl ? repoUrl.replace("https://github.com/", "").split("/") : ["", name];
     const repoOwner = parts[0];
     const repoName = parts[1];
     const fullRepoName = `${repoOwner}/${repoName}`;
