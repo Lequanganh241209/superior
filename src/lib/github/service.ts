@@ -248,3 +248,14 @@ export async function revertCommit(
     return { success: false, error: error.message };
   }
 }
+
+export async function pushFileToRepo(
+  owner: string,
+  repo: string,
+  path: string,
+  content: string,
+  message: string,
+  accessToken?: string
+) {
+  return pushFilesToRepo(owner, repo, message, [{ path, content }], accessToken);
+}

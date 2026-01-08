@@ -32,7 +32,7 @@ const overrideFor = (p: Project) => {
   const key2 = tail.toLowerCase();
   return OVERRIDES[key1] || OVERRIDES[key2] || null;
 };
-export const healPreview = async (p: Project) => {
+const healPreview = async (p: Project) => {
   const ov = overrideFor(p);
   if (ov) return ov;
   if ((p.deployment_url || "").toLowerCase().includes("writingtask2.vercel.app")) {
