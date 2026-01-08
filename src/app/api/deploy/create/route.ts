@@ -7,7 +7,7 @@ import path from "path";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, repoId, repoName, files, useWorkspace } = body;
+    const { name, repoId, repoName, files, useWorkspace, accessToken } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
       name: name.toLowerCase().replace(/\s+/g, "-"),
       repoId,
       repoName,
-      files: files || workspaceFiles
+      files: files || workspaceFiles,
+      accessToken
     });
 
     if (!deployResult.success) {
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
         SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
         OPENAI_API_KEY: process.env.OPENAI_API_KEY || ""
       };
-      await setProjectEnv((deployResult as any).projectName || name.toLowerCase().replace(/\s+/g, "-"), envs);
+      await setProjectEnv((deployResult as any).projectName || name.toLowerCase().replace(/\s+/g, "-"), envs, accessToken);
     } catch {}
 
     // V2 Upgrade: Save Metadata to Context Oracle

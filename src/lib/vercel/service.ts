@@ -6,11 +6,12 @@ export interface DeployParams {
   repoName?: string; // Optional now
   type?: string;
   files?: { path: string; content: string }[]; // New: Direct files
+  accessToken?: string;
 }
 
-export async function createDeployment({ name, repoId, repoName, type = "github", files }: DeployParams) {
+export async function createDeployment({ name, repoId, repoName, type = "github", files, accessToken }: DeployParams) {
   try {
-    const token = process.env.VERCEL_ACCESS_TOKEN;
+    const token = accessToken || process.env.VERCEL_ACCESS_TOKEN;
     if (!token) throw new Error("VERCEL_ACCESS_TOKEN is missing");
 
     // Strategy: 
@@ -22,7 +23,8 @@ export async function createDeployment({ name, repoId, repoName, type = "github"
     }
 
     // Fallback: Git Linking (Original Logic)
-    if (!repoName || !repoId) throw new Error("Missing repo info for git deployment");
+    // Allow linking with just repo name if Vercel GitHub App is installed
+    if (!repoName) throw new Error("Missing repo info: repoName is required for git deployment");
 
     const response = await fetch(`${VERCEL_API_URL}/v9/projects`, {
       method: "POST",
@@ -36,7 +38,7 @@ export async function createDeployment({ name, repoId, repoName, type = "github"
         gitRepository: {
           type: type,
           repo: repoName,
-          repoId: repoId
+          ...(repoId ? { repoId } : {})
         }
       }),
     });
@@ -152,8 +154,8 @@ async function deployWithFiles(projectName: string, files: { path: string; conte
     }
 }
 
-export async function setProjectEnv(projectName: string, envs: Record<string, string>) {
-  const token = process.env.VERCEL_ACCESS_TOKEN;
+export async function setProjectEnv(projectName: string, envs: Record<string, string>, accessToken?: string) {
+  const token = accessToken || process.env.VERCEL_ACCESS_TOKEN;
   if (!token) throw new Error("VERCEL_ACCESS_TOKEN is missing");
   const projRes = await fetch(`${VERCEL_API_URL}/v9/projects/${projectName}`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -195,6 +197,90 @@ export async function setProjectEnv(projectName: string, envs: Record<string, st
         body: JSON.stringify(payload)
       });
     }
+  }
+  return true;
+}
+
+export async function bindCanonicalAlias(projectName: string, accessToken?: string) {
+  const token = accessToken || process.env.VERCEL_ACCESS_TOKEN;
+  if (!token) throw new Error("VERCEL_ACCESS_TOKEN is missing");
+  const projRes = await fetch(`${VERCEL_API_URL}/v9/projects/${projectName}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!projRes.ok) throw new Error("Project not found");
+  const proj = await projRes.json();
+  const depRes = await fetch(`${VERCEL_API_URL}/v13/deployments?projectId=${proj.id}&limit=1`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!depRes.ok) throw new Error("No deployments found");
+  const deps = await depRes.json();
+  const first = deps.deployments?.[0];
+  const deploymentId = first?.uid || first?.id;
+  if (!deploymentId) throw new Error("No deployment id");
+  const aliasRes = await fetch(`${VERCEL_API_URL}/v13/deployments/${deploymentId}/aliases`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ alias: `${projectName}.vercel.app` })
+  });
+  if (!aliasRes.ok) {
+    const err = await aliasRes.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Alias bind failed");
+  }
+  return true;
+}
+
+export async function disableDeploymentProtection(projectName: string, accessToken?: string) {
+  const token = accessToken || process.env.VERCEL_ACCESS_TOKEN;
+  if (!token) throw new Error("VERCEL_ACCESS_TOKEN is missing");
+  const projRes = await fetch(`${VERCEL_API_URL}/v9/projects/${projectName}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!projRes.ok) throw new Error("Project not found");
+  const proj = await projRes.json();
+  try {
+    await fetch(`${VERCEL_API_URL}/v9/projects/${proj.id}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        vercelAuth: false,
+        passwordProtection: false,
+        deploymentProtection: { enabled: false }
+      })
+    });
+  } catch {}
+  return true;
+}
+
+export async function linkGitRepository(projectName: string, repoFullName: string, accessToken?: string) {
+  const token = accessToken || process.env.VERCEL_ACCESS_TOKEN;
+  if (!token) throw new Error("VERCEL_ACCESS_TOKEN is missing");
+  const projRes = await fetch(`${VERCEL_API_URL}/v9/projects/${projectName}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!projRes.ok) throw new Error("Project not found");
+  const proj = await projRes.json();
+  const patchRes = await fetch(`${VERCEL_API_URL}/v9/projects/${proj.id}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      gitRepository: {
+        type: "github",
+        repo: repoFullName
+      }
+    })
+  });
+  if (!patchRes.ok) {
+    const err = await patchRes.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Failed to link GitHub repository");
   }
   return true;
 }
