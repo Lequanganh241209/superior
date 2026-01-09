@@ -58,43 +58,43 @@ export function ProjectInit() {
         { path: "next.config.js", content: "module.exports={reactStrictMode:true,async headers(){return[{source:'/(:?)(.*)',headers:[{key:'Content-Security-Policy',value:'frame-ancestors *'}]}]}}"}
     ];
     const ensureRequiredFiles = (files: { path: string; content: string }[]) => {
-        const set = new Set(files.map(f => f.path));
         const out = [...files];
-        if (!set.has("package.json")) {
-            out.push({
-                path: "package.json",
-                content: JSON.stringify({
-                    name: slug || "aether-app",
-                    version: "1.0.0",
-                    private: true,
-                    scripts: { dev: "next dev", build: "next build", start: "next start" },
-                    dependencies: { 
-                        "next": "14.1.0", 
-                        "react": "18.2.0", 
-                        "react-dom": "18.2.0",
-                        "lucide-react": "^0.300.0",
-                        "clsx": "^2.1.0",
-                        "tailwind-merge": "^2.2.0",
-                        "tailwindcss-animate": "^1.0.7",
-                        "class-variance-authority": "^0.7.0",
-                        "@radix-ui/react-slot": "^1.0.2"
-                    },
-                    devDependencies: {
-                        "typescript": "^5",
-                        "@types/node": "^20",
-                        "@types/react": "^18",
-                        "@types/react-dom": "^18",
-                        "autoprefixer": "^10.0.1",
-                        "postcss": "^8",
-                        "tailwindcss": "^3.3.0"
-                    }
-                }, null, 2)
-            });
+        const upsert = (filePath: string, content: string) => {
+            const idx = out.findIndex(f => f.path === filePath);
+            if (idx === -1) out.push({ path: filePath, content });
+            else out[idx] = { ...out[idx], content };
+        };
+
+        if (!out.find(f => f.path === "package.json")) {
+            upsert("package.json", JSON.stringify({
+                name: slug || "aether-app",
+                version: "1.0.0",
+                private: true,
+                scripts: { dev: "next dev", build: "next build", start: "next start" },
+                dependencies: { 
+                    "next": "14.1.0", 
+                    "react": "18.2.0", 
+                    "react-dom": "18.2.0",
+                    "lucide-react": "^0.300.0",
+                    "clsx": "^2.1.0",
+                    "tailwind-merge": "^2.2.0",
+                    "tailwindcss-animate": "^1.0.7",
+                    "class-variance-authority": "^0.7.0",
+                    "@radix-ui/react-slot": "^1.0.2"
+                },
+                devDependencies: {
+                    "typescript": "^5",
+                    "@types/node": "^20",
+                    "@types/react": "^18",
+                    "@types/react-dom": "^18",
+                    "autoprefixer": "^10.0.1",
+                    "postcss": "^8",
+                    "tailwindcss": "^3.3.0"
+                }
+            }, null, 2));
         }
-        if (!set.has("next.config.js")) {
-            out.push({ 
-                path: "next.config.js", 
-                content: `
+        if (!out.find(f => f.path === "next.config.js")) {
+            upsert("next.config.js", `
 /** Embedded-friendly config */
 module.exports = {
   reactStrictMode: true,
@@ -109,43 +109,103 @@ module.exports = {
     ]
   },
 }
-`.trim() 
-            });
+`.trim());
         }
-        if (!set.has("next-env.d.ts")) {
-            out.push({ path: "next-env.d.ts", content: "/// <reference types=\"next\" />\n/// <reference types=\"next/image-types/global\" />" });
+        if (!out.find(f => f.path === "next-env.d.ts")) {
+            upsert("next-env.d.ts", "/// <reference types=\"next\" />\n/// <reference types=\"next/image-types/global\" />");
         }
-        if (!set.has("tsconfig.json")) {
-            out.push({
-                path: "tsconfig.json",
-                content: JSON.stringify({
-                    compilerOptions: {
-                        target: "ES2020",
-                        lib: ["DOM", "ES2020"],
-                        jsx: "preserve",
-                        moduleResolution: "Node",
-                        strict: true,
-                        esModuleInterop: true,
-                        forceConsistentCasingInFileNames: true,
-                        baseUrl: ".",
-                        paths: { "@/*": ["./src/*"] }
-                    },
-                    include: ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
-                    exclude: ["node_modules"]
-                }, null, 2)
-            });
+        upsert("tsconfig.json", JSON.stringify({
+            compilerOptions: {
+                target: "ES2020",
+                lib: ["DOM", "DOM.Iterable", "ESNext"],
+                allowJs: true,
+                skipLibCheck: true,
+                strict: true,
+                noEmit: true,
+                esModuleInterop: true,
+                module: "esnext",
+                moduleResolution: "bundler",
+                resolveJsonModule: true,
+                isolatedModules: true,
+                jsx: "preserve",
+                incremental: true,
+                plugins: [{ name: "next" }],
+                baseUrl: ".",
+                paths: { "@/*": ["./src/*"] }
+            },
+            include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+            exclude: ["node_modules"]
+        }, null, 2));
+        if (!out.find(f => f.path === "src/app/layout.tsx")) {
+            upsert("src/app/layout.tsx", "export default function RootLayout({ children }: { children: React.ReactNode }) { return (<html lang=\"en\"><body>{children}</body></html>); }");
         }
-        if (!set.has("src/app/layout.tsx")) {
-            out.push({
-                path: "src/app/layout.tsx",
-                content: "export default function RootLayout({ children }: { children: React.ReactNode }) { return (<html lang=\"en\"><body>{children}</body></html>); }"
-            });
+        if (!out.find(f => f.path === "src/app/globals.css")) {
+            upsert("src/app/globals.css", "html,body{margin:0;padding:0}*,*:before,*:after{box-sizing:border-box}");
         }
-        if (!set.has("src/app/globals.css")) {
-            out.push({
-                path: "src/app/globals.css",
-                content: "html,body{margin:0;padding:0}*,*:before,*:after{box-sizing:border-box}"
-            });
+
+        if (!out.find(f => f.path === "src/lib/utils.ts")) {
+            upsert("src/lib/utils.ts", `import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+`);
+        }
+        if (!out.find(f => f.path === "src/components/ui/button.tsx")) {
+            upsert("src/components/ui/button.tsx", `import * as React from "react"
+import { cn } from "../../lib/utils"
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "default" | "outline" | "ghost"
+  size?: "default" | "sm" | "lg" | "icon"
+}
+
+const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
+  default: "bg-primary text-primary-foreground hover:opacity-90",
+  outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+  ghost: "hover:bg-accent hover:text-accent-foreground",
+}
+
+const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
+  default: "h-10 px-4 py-2",
+  sm: "h-9 rounded-md px-3",
+  lg: "h-11 rounded-md px-8",
+  icon: "h-10 w-10",
+}
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant = "default", size = "default", ...props }, ref) => (
+    <button
+      ref={ref}
+      className={cn(
+        "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        variantClasses[variant],
+        sizeClasses[size],
+        className
+      )}
+      {...props}
+    />
+  )
+)
+Button.displayName = "Button"
+`);
+        }
+        if (!out.find(f => f.path === "src/components/ui/card.tsx")) {
+            upsert("src/components/ui/card.tsx", `import * as React from "react"
+import { cn } from "../../lib/utils"
+
+export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)}
+      {...props}
+    />
+  )
+)
+Card.displayName = "Card"
+`);
         }
         return out;
     };
@@ -219,7 +279,16 @@ module.exports = {
             codeData = { files: fallbackFiles };
         }
         
-        const ensuredFiles = ensureRequiredFiles(codeData.files);
+        const ensuredFiles = ensureRequiredFiles(codeData.files).map((file) => {
+            const normalizedPath = (file.path || "").replace(/\\/g, "/");
+            const isCodeFile = normalizedPath.endsWith(".ts") || normalizedPath.endsWith(".tsx");
+            if (!isCodeFile) return file;
+            const parts = normalizedPath.split("/");
+            const depth = parts[0] === "src" ? Math.max(parts.length - 2, 0) : 0;
+            const relativePrefix = depth > 0 ? "../".repeat(depth) : "./";
+            const content = (file.content || "").replace(/(['"])@\//g, `$1${relativePrefix}`);
+            return { ...file, content };
+        });
         addLog(`Code Generation Complete: ${ensuredFiles.length} files ready.`);
 
         // 3. DEPLOYMENT PHASE
