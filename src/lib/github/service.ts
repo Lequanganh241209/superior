@@ -38,6 +38,79 @@ export interface FileChange {
   content: string;
 }
 
+export interface RepoTreeEntry {
+  path: string;
+  sha: string;
+  type: "blob" | "tree";
+}
+
+export async function getMainRepoTreeEntries(
+  owner: string,
+  repo: string,
+  accessToken?: string
+): Promise<RepoTreeEntry[]> {
+  const octokit = getOctokit(accessToken);
+
+  let refData;
+  try {
+    const response = await octokit.rest.git.getRef({
+      owner,
+      repo,
+      ref: "heads/main",
+    });
+    refData = response.data;
+  } catch (error) {
+    // Fallback to master if main not found
+    console.log("main branch not found, trying master...");
+    const response = await octokit.rest.git.getRef({
+      owner,
+      repo,
+      ref: "heads/master",
+    });
+    refData = response.data;
+  }
+
+  const commitSha = refData.object.sha;
+  const { data: commitData } = await octokit.rest.git.getCommit({
+    owner,
+    repo,
+    commit_sha: commitSha,
+  });
+
+  const { data: treeData } = await octokit.rest.git.getTree({
+    owner,
+    repo,
+    tree_sha: commitData.tree.sha,
+    recursive: "true",
+  });
+
+  const entries = (treeData.tree || [])
+    .filter((e) => !!e.path && !!e.sha && (e.type === "blob" || e.type === "tree"))
+    .map((e) => ({ path: e.path as string, sha: e.sha as string, type: e.type as "blob" | "tree" }));
+
+  return entries;
+}
+
+export async function getBlobText(
+  owner: string,
+  repo: string,
+  sha: string,
+  accessToken?: string
+): Promise<string> {
+  const octokit = getOctokit(accessToken);
+  const { data } = await octokit.rest.git.getBlob({
+    owner,
+    repo,
+    file_sha: sha,
+  });
+
+  const content = typeof data.content === "string" ? data.content : "";
+  if (data.encoding === "base64") {
+    return Buffer.from(content, "base64").toString("utf-8");
+  }
+  return content;
+}
+
 export async function createEvolutionPR(
   owner: string,
   repo: string,
@@ -57,6 +130,12 @@ export async function createEvolutionPR(
       ref: "heads/main",
     });
     const mainSha = refData.object.sha;
+    const { data: mainCommit } = await octokit.rest.git.getCommit({
+      owner,
+      repo,
+      commit_sha: mainSha,
+    });
+    const mainTreeSha = mainCommit.tree.sha;
 
     // 2. Create new branch
     await octokit.rest.git.createRef({
@@ -87,7 +166,7 @@ export async function createEvolutionPR(
     const { data: treeData } = await octokit.rest.git.createTree({
       owner,
       repo,
-      base_tree: mainSha,
+      base_tree: mainTreeSha,
       tree: treeItems,
     });
 
@@ -137,12 +216,33 @@ export async function pushFilesToRepo(
         const octokit = getOctokit(accessToken);
         
         // Get latest commit sha
-        const { data: refData } = await octokit.rest.git.getRef({
-            owner,
-            repo,
-            ref: "heads/main",
-        });
+        let refData;
+        let branch = "main";
+        try {
+            const res = await octokit.rest.git.getRef({
+                owner,
+                repo,
+                ref: "heads/main",
+            });
+            refData = res.data;
+        } catch (e) {
+            console.log("main branch not found, trying master...");
+            const res = await octokit.rest.git.getRef({
+                owner,
+                repo,
+                ref: "heads/master",
+            });
+            refData = res.data;
+            branch = "master";
+        }
+        
         const latestCommitSha = refData.object.sha;
+        const { data: latestCommit } = await octokit.rest.git.getCommit({
+          owner,
+          repo,
+          commit_sha: latestCommitSha,
+        });
+        const latestTreeSha = latestCommit.tree.sha;
 
         // Create blobs
         const treeItems = await Promise.all(
@@ -166,7 +266,7 @@ export async function pushFilesToRepo(
         const { data: tree } = await octokit.rest.git.createTree({
             owner,
             repo,
-            base_tree: latestCommitSha,
+            base_tree: latestTreeSha,
             tree: treeItems,
         });
 
@@ -183,7 +283,7 @@ export async function pushFilesToRepo(
         await octokit.rest.git.updateRef({
             owner,
             repo,
-            ref: "heads/main",
+            ref: `heads/${branch}`,
             sha: newCommit.sha,
         });
 

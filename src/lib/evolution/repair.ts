@@ -1,6 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createEvolutionPR, getBlobText, getMainRepoTreeEntries, type FileChange } from "@/lib/github/service";
-import { supabase } from "@/lib/supabase/client";
+import { FileChange, getBlobText, getMainRepoTreeEntries } from "@/lib/github/service";
 
 const STANDARD_FIX_FILES: FileChange[] = [
   {
@@ -77,13 +75,40 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
 ))
 Card.displayName = "Card"
 
-export { Card }`
+const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("flex flex-col space-y-1.5 p-6", className)} {...props} />
+))
+CardHeader.displayName = "CardHeader"
+
+const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(({ className, ...props }, ref) => (
+  <h3 ref={ref} className={cn("text-2xl font-semibold leading-none tracking-tight", className)} {...props} />
+))
+CardTitle.displayName = "CardTitle"
+
+const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(({ className, ...props }, ref) => (
+  <p ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+))
+CardDescription.displayName = "CardDescription"
+
+const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+))
+CardContent.displayName = "CardContent"
+
+const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("flex items-center p-6 pt-0", className)} {...props} />
+))
+CardFooter.displayName = "CardFooter"
+
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }`
   }
 ];
 
 function getRelativePrefixForFilePath(filePath: string) {
   const normalized = filePath.replace(/\\/g, "/");
   const parts = normalized.split("/");
+  // Assumes structure starts with src/ or just file in root (if rootIndex logic needed, adjust)
+  // For generated projects, everything usually in src/
   const rootIndex = parts[0] === "src" ? 1 : 0;
   const dirPartsCount = parts.length - 1 - rootIndex;
   return dirPartsCount > 0 ? "../".repeat(dirPartsCount) : "./";
@@ -100,13 +125,25 @@ function rewriteImports(content: string, filePath: string) {
 function mergeRequiredDeps(packageJsonText: string) {
   const parsed = JSON.parse(packageJsonText);
   const deps: Record<string, string> = parsed.dependencies && typeof parsed.dependencies === "object" ? parsed.dependencies : {};
+  const devDeps: Record<string, string> = parsed.devDependencies && typeof parsed.devDependencies === "object" ? parsed.devDependencies : {};
 
   const required: Record<string, string> = {
     "clsx": "^2.1.0",
     "tailwind-merge": "^2.2.0",
     "tailwindcss-animate": "^1.0.7",
     "class-variance-authority": "^0.7.0",
-    "@radix-ui/react-slot": "^1.0.2"
+    "@radix-ui/react-slot": "^1.0.2",
+    "lucide-react": "^0.300.0"
+  };
+
+  const requiredDev: Record<string, string> = {
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.0.1",
+    "postcss": "^8",
+    "tailwindcss": "^3.3.0"
   };
 
   let changed = false;
@@ -116,117 +153,66 @@ function mergeRequiredDeps(packageJsonText: string) {
       changed = true;
     }
   }
+  
+  for (const [name, version] of Object.entries(requiredDev)) {
+    if (!devDeps[name]) {
+      devDeps[name] = version;
+      changed = true;
+    }
+  }
+
   parsed.dependencies = deps;
+  parsed.devDependencies = devDeps;
 
   return { changed, content: JSON.stringify(parsed, null, 2) };
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
+export async function generateRepairChanges(
+  owner: string,
+  repo: string,
+  accessToken?: string
+): Promise<FileChange[]> {
+  const entries = await getMainRepoTreeEntries(owner, repo, accessToken);
+  const blobs = new Map(entries.filter((e) => e.type === "blob").map((e) => [e.path, e.sha]));
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const changes: FileChange[] = [];
+
+  // 1. Ensure Standard Components exist
+  for (const std of STANDARD_FIX_FILES) {
+    if (!blobs.has(std.path)) {
+      changes.push(std);
     }
-
-    const body = await req.json();
-    const { projectId, repoName, changes, description, autoFix, accessToken } = body as {
-      projectId?: string;
-      repoName?: string;
-      changes?: FileChange[];
-      description?: string;
-      autoFix?: boolean;
-      accessToken?: string;
-    };
-
-    if (!repoName) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-
-    const [owner, repo] = repoName.split("/");
-    const branchName = `evolution-${Date.now()}`;
-
-    let effectiveChanges = Array.isArray(changes) ? changes : [];
-    if (effectiveChanges.length === 0 && autoFix) {
-      const entries = await getMainRepoTreeEntries(owner, repo, accessToken);
-      const blobs = new Map(entries.filter((e) => e.type === "blob").map((e) => [e.path, e.sha]));
-
-      const autoChanges: FileChange[] = [];
-
-      for (const std of STANDARD_FIX_FILES) {
-        if (!blobs.has(std.path)) {
-          autoChanges.push(std);
-        }
-      }
-
-      const packageSha = blobs.get("package.json");
-      if (packageSha) {
-        try {
-          const pkgText = await getBlobText(owner, repo, packageSha, accessToken);
-          const merged = mergeRequiredDeps(pkgText);
-          if (merged.changed) {
-            autoChanges.push({ path: "package.json", content: merged.content });
-          }
-        } catch {
-        }
-      }
-
-      const codeFiles = Array.from(blobs.entries())
-        .filter(([path]) => path.endsWith(".ts") || path.endsWith(".tsx"));
-
-      for (const [path, sha] of codeFiles) {
-        try {
-          const text = await getBlobText(owner, repo, sha, accessToken);
-          const rewritten = rewriteImports(text, path);
-          if (rewritten !== text) {
-            autoChanges.push({ path, content: rewritten });
-          }
-        } catch {
-        }
-      }
-
-      effectiveChanges = autoChanges;
-    }
-
-    if (effectiveChanges.length === 0) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-    
-    // Create PR via GitHub Service
-    const prResult = await createEvolutionPR(
-      owner,
-      repo,
-      branchName,
-      "Evolution X: Optimization Proposal",
-      description || "Automated optimization by Aether OS Evolution Engine.",
-      effectiveChanges,
-      accessToken
-    );
-
-    if (!prResult.success) {
-      return NextResponse.json({ error: prResult.error }, { status: 500 });
-    }
-
-    // Log to Evolution History in Supabase
-    const { error: dbError } = await supabase
-      .from("evolution_history")
-      .insert({
-        project_id: projectId,
-        version: branchName,
-        description: description,
-        pr_number: prResult.prNumber,
-        status: "pending"
-      });
-
-    if (dbError) {
-        console.error("Failed to log evolution history:", dbError);
-        // Don't fail the request, just log error
-    }
-
-    return NextResponse.json({ success: true, prUrl: prResult.prUrl });
-
-  } catch (error: any) {
-    console.error("Evolution API Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
+
+  // 2. Fix package.json dependencies
+  const packageSha = blobs.get("package.json");
+  if (packageSha) {
+    try {
+      const pkgText = await getBlobText(owner, repo, packageSha, accessToken);
+      const merged = mergeRequiredDeps(pkgText);
+      if (merged.changed) {
+        changes.push({ path: "package.json", content: merged.content });
+      }
+    } catch (e) {
+      console.error("Failed to process package.json:", e);
+    }
+  }
+
+  // 3. Rewrite Imports in .ts/.tsx files
+  const codeFiles = Array.from(blobs.entries())
+    .filter(([path]) => path.endsWith(".ts") || path.endsWith(".tsx"));
+
+  for (const [path, sha] of codeFiles) {
+    try {
+      const text = await getBlobText(owner, repo, sha, accessToken);
+      const rewritten = rewriteImports(text, path);
+      if (rewritten !== text) {
+        changes.push({ path, content: rewritten });
+      }
+    } catch (e) {
+        console.error(`Failed to process ${path}:`, e);
+    }
+  }
+
+  return changes;
 }

@@ -512,7 +512,197 @@ export default config
       return file;
     });
 
-    // 2. INJECT STANDARD COMPONENTS (If missing)
+    // 3. ENFORCE CONFIGURATION FILES (PostCSS, Tailwind, Package.json)
+    const MANDATORY_FILES = [
+        {
+             path: "postcss.config.js",
+             content: "module.exports = { plugins: { tailwindcss: {}, autoprefixer: {}, }, }"
+        },
+        {
+             path: "tailwind.config.ts",
+             content: `import type { Config } from "tailwindcss"
+
+const config = {
+  darkMode: ["class"],
+  content: [
+    './pages/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+    './app/**/*.{ts,tsx}',
+    './src/**/*.{ts,tsx}',
+  ],
+  prefix: "",
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+} satisfies Config
+
+export default config`
+        },
+        {
+            path: "src/app/globals.css",
+            content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}`
+        }
+    ];
+
+    // Merge Mandatory Files
+    MANDATORY_FILES.forEach(mandatoryFile => {
+        const existingIndex = result.files.findIndex((f: any) => f.path === mandatoryFile.path);
+        if (existingIndex !== -1) {
+            result.files[existingIndex] = mandatoryFile;
+        } else {
+            result.files.push(mandatoryFile);
+        }
+    });
+    
+    // 4. FORCE PACKAGE.JSON DEPENDENCIES
+    const packageJsonIndex = result.files.findIndex((f: any) => f.path === "package.json");
+    if (packageJsonIndex !== -1) {
+        try {
+            const pkg = JSON.parse(result.files[packageJsonIndex].content);
+            pkg.dependencies = {
+                ...pkg.dependencies,
+                "lucide-react": "^0.344.0",
+                "clsx": "^2.1.0",
+                "tailwind-merge": "^2.2.1",
+                "tailwindcss-animate": "^1.0.7",
+                "class-variance-authority": "^0.7.0",
+                "@radix-ui/react-slot": "^1.0.2",
+                "framer-motion": "^11.0.8"
+            };
+            pkg.devDependencies = {
+                ...pkg.devDependencies,
+                "autoprefixer": "^10.0.1",
+                "postcss": "^8",
+                "tailwindcss": "^3.3.0"
+            };
+            result.files[packageJsonIndex].content = JSON.stringify(pkg, null, 2);
+        } catch (e) {
+            console.error("Failed to parse package.json", e);
+        }
+    }
+
+    // 5. INJECT STANDARD COMPONENTS (If missing)
     const STANDARD_COMPONENTS = [
         {
             path: "src/lib/utils.ts",
@@ -588,7 +778,32 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
 ))
 Card.displayName = "Card"
 
-export { Card }`
+const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("flex flex-col space-y-1.5 p-6", className)} {...props} />
+))
+CardHeader.displayName = "CardHeader"
+
+const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(({ className, ...props }, ref) => (
+  <h3 ref={ref} className={cn("text-2xl font-semibold leading-none tracking-tight", className)} {...props} />
+))
+CardTitle.displayName = "CardTitle"
+
+const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(({ className, ...props }, ref) => (
+  <p ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+))
+CardDescription.displayName = "CardDescription"
+
+const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+))
+CardContent.displayName = "CardContent"
+
+const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("flex items-center p-6 pt-0", className)} {...props} />
+))
+CardFooter.displayName = "CardFooter"
+
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }`
         }
     ];
 
@@ -598,7 +813,7 @@ export { Card }`
         }
     }
 
-    // 3. DYNAMICALLY FIX IMPORTS: Replace @/ with correct relative paths based on file depth
+    // 3. DYNAMICALLY FIX IMPORTS: Replace @/ and /components-style imports with correct relative paths
     result.files = result.files.map((file: any) => {
       if (file.path.endsWith(".tsx") || file.path.endsWith(".ts")) {
         // Calculate depth relative to src/
@@ -608,14 +823,9 @@ export { Card }`
         const parts = file.path.split('/');
         const depth = parts.length - 2; // Subtract filename and src root
         
-        if (depth > 0) {
-            const relativePrefix = "../".repeat(depth);
-            // AGGRESSIVE REPLACEMENT: Replace any quoted string starting with @/
-            file.content = file.content.replace(/(['"])@\//g, `$1${relativePrefix}`);
-        } else if (depth === 0) {
-            // File is at src/root (e.g. src/middleware.ts), @/ maps to ./
-             file.content = file.content.replace(/(['"])@\//g, '$1./');
-        }
+        const relativePrefix = depth > 0 ? "../".repeat(depth) : "./";
+        file.content = file.content.replace(/(['"])@\//g, `$1${relativePrefix}`);
+        file.content = file.content.replace(/(['"])\/(components|lib|app|hooks|store)\//g, `$1${relativePrefix}$2/`);
       }
       return file;
     });
@@ -637,6 +847,8 @@ export { Card }`
         "next": "14.1.0",
         "lucide-react": "^0.300.0",
         "framer-motion": "^11.0.0",
+        "class-variance-authority": "^0.7.0",
+        "@radix-ui/react-slot": "^1.0.2",
         "clsx": "^2.1.0",
         "tailwind-merge": "^2.2.0",
         "tailwindcss-animate": "^1.0.7"
