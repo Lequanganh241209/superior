@@ -473,7 +473,7 @@ export default config
     GUIDELINES:
     - **Code Quality**: Strict TypeScript, no "any" types if possible.
     - **Import Strategy**: YOU MUST USE RELATIVE IMPORTS (e.g., "../components/ui/button", "../../lib/utils"). DO NOT USE PATH ALIASES (e.g., "@/components/..."). Vercel build will FAIL if you use aliases.
-    - **Styling**: Use `clsx` and `tailwind-merge` for dynamic classes.
+    - **Styling**: Use \`clsx\` and \`tailwind-merge\` for dynamic classes.
     - **Theme**: Default to a sophisticated DARK MODE.
     - **Content**: Use the User Prompt to infer specific text, titles, and features.
 
