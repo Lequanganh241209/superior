@@ -27,7 +27,7 @@ export default function RootLayout({
             <div className="container flex h-14 max-w-screen-2xl items-center">
               <div className="mr-4 hidden md:flex">
                 <a className="mr-6 flex items-center space-x-2" href="/">
-                  <span className="hidden font-bold sm:inline-block text-primary tracking-tighter">AETHER OS_</span>
+                  <span className="hidden font-bold sm:inline-block text-primary tracking-tighter">AETHER OS_ V2.2 (Hardened)</span>
                 </a>
               </div>
             </div>
