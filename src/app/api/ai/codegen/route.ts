@@ -535,6 +535,22 @@ export default config
              content: "module.exports = { plugins: { tailwindcss: {}, autoprefixer: {}, }, }"
         },
         {
+             path: "next.config.mjs",
+             content: `/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export',
+  images: { unoptimized: true },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+};
+
+export default nextConfig;`
+        },
+        {
              path: "tsconfig.json",
              content: JSON.stringify({
                "compilerOptions": {
@@ -717,11 +733,18 @@ export default config`
         }
     });
     
-    // 4. FORCE PACKAGE.JSON DEPENDENCIES
+    // 4. FORCE PACKAGE.JSON DEPENDENCIES & SCRIPTS
     const packageJsonIndex = result.files.findIndex((f: any) => f.path === "package.json");
     if (packageJsonIndex !== -1) {
         try {
             const pkg = JSON.parse(result.files[packageJsonIndex].content);
+            pkg.scripts = {
+                ...pkg.scripts,
+                "dev": "next dev",
+                "build": "next build",
+                "start": "next start",
+                "lint": "next lint"
+            };
             pkg.dependencies = {
                 ...pkg.dependencies,
                 "lucide-react": "^0.344.0",
