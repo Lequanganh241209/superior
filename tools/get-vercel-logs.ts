@@ -5,7 +5,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 const token = process.env.VERCEL_ACCESS_TOKEN;
-const deploymentId = "dpl_7Xh5q57i86BLH4dzeNHYEY5xzJhY";
+const deploymentId = process.argv[2] || "dpl_7Xh5q57i86BLH4dzeNHYEY5xzJhY";
 
 async function getLogs() {
   try {

@@ -6,7 +6,7 @@ dotenv.config();
 
 const token = process.env.VERCEL_ACCESS_TOKEN;
 console.log("Token present:", !!token);
-const projectId = "prj_ATfejMDqrLF5ntU0LBfm31RdaPoe"; // Taylor Swift project
+const projectId = process.argv[2] || "prj_s4pAKgWphmcFSlUpP0Yd8cTBdl0i"; // default to superior-roan
 
 async function listDeployments() {
   try {

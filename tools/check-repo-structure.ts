@@ -35,7 +35,7 @@ async function checkStructure() {
 
     // Check tsconfig.json
     const tsConfig = tree.find((t: any) => t.path === "tsconfig.json");
-    if (tsConfig) {
+    if (tsConfig && tsConfig.sha) {
         const { data } = await octokit.rest.git.getBlob({
             owner,
             repo,
@@ -51,7 +51,7 @@ async function checkStructure() {
     const postcss = tree.find((t: any) => t.path === "postcss.config.js");
     console.log(`\npostcss.config.js: ${postcss ? "✅ Found" : "❌ MISSING"}`);
     
-    if (postcss) {
+    if (postcss && postcss.sha) {
          const { data } = await octokit.rest.git.getBlob({
             owner,
             repo,
@@ -60,6 +60,33 @@ async function checkStructure() {
         const content = Buffer.from(data.content, "base64").toString();
         console.log("Content:", content);
     }
+
+    // Check tsconfig.json
+    const tsconfig = tree.find((t: any) => t.path === "tsconfig.json");
+    if (tsconfig && tsconfig.sha) {
+        const { data } = await octokit.rest.git.getBlob({
+            owner,
+            repo,
+            file_sha: tsconfig.sha
+        });
+        const content = Buffer.from(data.content, "base64").toString();
+        console.log("\ntsconfig.json content:");
+        console.log(content);
+    }
+
+    // Check src/app/page.tsx
+    const page = tree.find((t: any) => t.path === "src/app/page.tsx");
+    if (page && page.sha) {
+            const { data } = await octokit.rest.git.getBlob({
+                owner,
+                repo,
+                file_sha: page.sha
+            });
+            const content = Buffer.from(data.content, "base64").toString();
+            console.log("\nsrc/app/page.tsx FULL CONTENT START:");
+            console.log(content);
+            console.log("src/app/page.tsx FULL CONTENT END");
+        }
 
   } catch (e: any) {
     console.error("Error:", e.message);
