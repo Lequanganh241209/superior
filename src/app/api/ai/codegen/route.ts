@@ -610,10 +610,10 @@ export { Card }`
         
         if (depth > 0) {
             const relativePrefix = "../".repeat(depth);
-            file.content = file.content.replace(/from\s+['"]@\//g, `from "${relativePrefix}`);
+            file.content = file.content.replace(/from\s+(['"])@\//g, `from $1${relativePrefix}`);
         } else if (depth === 0) {
             // File is at src/root (e.g. src/middleware.ts), @/ maps to ./
-             file.content = file.content.replace(/from\s+['"]@\//g, 'from "./');
+             file.content = file.content.replace(/from\s+(['"])@\//g, 'from $1./');
         }
       }
       return file;
