@@ -268,7 +268,7 @@ export default function Dashboard() {
                         {activeTab === 'billing' && "Enterprise Billing"}
                     </h1>
                     <p className="text-muted-foreground mt-1 text-sm">
-                        Aether OS V2 / Main / {activeTab}
+                        Aether OS V2.1 (Patched) / Main / {activeTab}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
