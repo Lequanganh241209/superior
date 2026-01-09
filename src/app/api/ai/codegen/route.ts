@@ -662,16 +662,23 @@ export { Card }`
     const correctTsConfig = JSON.stringify({
       compilerOptions: {
         target: "ES2020",
-        lib: ["DOM", "ES2020"],
-        jsx: "preserve",
-        moduleResolution: "Node",
+        lib: ["DOM", "DOM.Iterable", "ESNext"],
+        allowJs: true,
+        skipLibCheck: true,
         strict: true,
+        noEmit: true,
         esModuleInterop: true,
-        forceConsistentCasingInFileNames: true,
+        module: "esnext",
+        moduleResolution: "bundler",
+        resolveJsonModule: true,
+        isolatedModules: true,
+        jsx: "preserve",
+        incremental: true,
+        plugins: [{ "name": "next" }],
         baseUrl: ".",
         paths: { "@/*": ["./src/*"] }
       },
-      include: ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+      include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
       exclude: ["node_modules"]
     }, null, 2);
 
