@@ -1,5 +1,5 @@
 
-import { adminClient } from "../admin";
+import { adminClient } from "../supabase/admin";
 import mime from "mime-types";
 
 const BUCKET_NAME = "sites";
