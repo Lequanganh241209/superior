@@ -610,10 +610,11 @@ export { Card }`
         
         if (depth > 0) {
             const relativePrefix = "../".repeat(depth);
-            file.content = file.content.replace(/from\s+(['"])@\//g, `from $1${relativePrefix}`);
+            // AGGRESSIVE REPLACEMENT: Replace any quoted string starting with @/
+            file.content = file.content.replace(/(['"])@\//g, `$1${relativePrefix}`);
         } else if (depth === 0) {
             // File is at src/root (e.g. src/middleware.ts), @/ maps to ./
-             file.content = file.content.replace(/from\s+(['"])@\//g, 'from $1./');
+             file.content = file.content.replace(/(['"])@\//g, '$1./');
         }
       }
       return file;
