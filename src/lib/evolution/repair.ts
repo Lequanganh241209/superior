@@ -1,4 +1,4 @@
-import { FileChange, getBlobText, getMainRepoTreeEntries } from "@/lib/github/service";
+import { FileChange, getBlobText, getMainRepoTreeEntries } from "../github/service";
 
 const STANDARD_FIX_FILES: FileChange[] = [
   {
@@ -172,7 +172,9 @@ export async function generateRepairChanges(
   repo: string,
   accessToken?: string
 ): Promise<FileChange[]> {
+  console.log("Getting repo tree...");
   const entries = await getMainRepoTreeEntries(owner, repo, accessToken);
+  console.log(`Found ${entries.length} entries in repo.`);
   const blobs = new Map(entries.filter((e) => e.type === "blob").map((e) => [e.path, e.sha]));
 
   const changes: FileChange[] = [];
@@ -202,11 +204,22 @@ export async function generateRepairChanges(
   const codeFiles = Array.from(blobs.entries())
     .filter(([path]) => path.endsWith(".ts") || path.endsWith(".tsx"));
 
+  console.log(`Checking imports in ${codeFiles.length} files...`);
+
   for (const [path, sha] of codeFiles) {
     try {
+      console.log(`Reading ${path}...`);
       const text = await getBlobText(owner, repo, sha, accessToken);
+      if (path === "src/app/page.tsx") {
+          console.log("Original content snippet:", text.substring(0, 200));
+      }
       const rewritten = rewriteImports(text, path);
+      if (path === "src/app/page.tsx") {
+          console.log("Rewritten content snippet:", rewritten.substring(0, 200));
+          console.log("Is different?", rewritten !== text);
+      }
       if (rewritten !== text) {
+        console.log(`Changes detected in ${path}`);
         changes.push({ path, content: rewritten });
       }
     } catch (e) {

@@ -430,15 +430,35 @@ export default config
     You are an Elite Senior Full-Stack Architect and UI/UX Designer.
     Your mission is to generate a PRODUCTION-READY, DEPLOYABLE Next.js 14 Application based on the User's Prompt and the Architect's Plan.
 
-    The goal is to rival "Lovable.dev" in quality:
-    1.  **Visually Stunning**: Use modern UI patterns, beautiful gradients, glassmorphism, and responsive layouts.
-    2.  **Fully Functional**: The app must be runnable immediately after deployment.
-    3.  **Component-Driven**: Break down the UI into small, reusable components in \`src/components\`.
+    The goal is to rival "Lovable.dev" or "v0.dev" in aesthetic quality, creating "Ultra-Premium" websites.
+
+    DESIGN SYSTEM & PHILOSOPHY (STRICT):
+    1.  **Layout & UX ("Bento Grid" & Luxury Spacing)**:
+        -   NEVER use boring vertical stacking. Use **Bento Grids**, **Staggered Grids**, or **Asymmetric Layouts**.
+        -   Use **Luxury Spacing**: Sections must have ample breathing room (e.g., \`py-24\` or \`py-32\`).
+        -   Responsive: ALWAYS Mobile-First (\`grid-cols-1 md:grid-cols-3\`).
+
+    2.  **Visual Polish (High-End Effects)**:
+        -   **Glassmorphism**: Use backdrop blur for Navbars and Cards (e.g., \`backdrop-blur-md bg-white/10 border border-white/10\`).
+        -   **Gradients**: Use sophisticated Mesh Gradients instead of flat colors (e.g., \`bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500\`).
+        -   **Animations (Framer Motion)**:
+            -   Elements MUST animate on scroll: \`initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}\`.
+            -   Interactive Cards: \`whileHover={{ scale: 1.05 }}\`.
+            -   Buttons: Use "magnetic" or "shimmer" effects.
+
+    3.  **Typography & Content**:
+        -   Use a **Serif** font for Headings (e.g., Playfair Display, Merino) and **Sans-serif** for Body (e.g., Inter, Geist) to create artistic contrast.
+        -   **Copywriting**: Write professional, marketing-grade copy. Do not just list data; tell a story.
+
+    4.  **High-End Components**:
+        -   **Images**: Use Unsplash with keywords "high-end", "abstract", "minimalist". URL: \`https://images.unsplash.com/photo-[ID]?auto=format&fit=crop&w=800&q=80\`.
+        -   **Icons**: Use \`lucide-react\` exclusively.
+        -   **Theme**: Support **Dark/Light Mode** (using \`next-themes\`). Default to Dark Mode for that "premium" feel.
 
     CRITICAL RULES FOR DEPLOYMENT SUCCESS:
     1.  **NO ALIAS IMPORTS**: You MUST use relative imports (e.g., \`../components/ui/button\`) for everything. DO NOT use \`@/\`.
     2.  **SELF-CONTAINED**: If you import \`Button\`, you MUST generate \`src/components/ui/button.tsx\`.
-    3.  **STRICT PATHS**: All files must be in \`src/\` (e.g., \`src/app/page.tsx\`, \`src/lib/utils.ts\`).
+    3.  **STRICT PATHS**: All files must be in \`src/\`.
 
     OUTPUT FORMAT:
     Return a JSON object with a single "files" array. Each item must have:
@@ -447,35 +467,31 @@ export default config
 
     MANDATORY FILE STRUCTURE (You MUST generate ALL of these):
     
-    1.  **Configuration Files** (Use standard Next.js 14 + Tailwind defaults):
-        - \`package.json\`: Include dependencies: next, react, react-dom, lucide-react, framer-motion, clsx, tailwind-merge, tailwindcss-animate.
-        - \`tsconfig.json\`: MUST include "baseUrl": "." and "paths": { "@/*": ["./src/*"] }.
-        - \`next.config.js\`
-        - \`tailwind.config.ts\`: Configure with CSS variables for colors (shadcn-like).
-        - \`postcss.config.js\`
-        - \`.gitignore\`
-        - \`next-env.d.ts\`
+    1.  **Configuration Files**:
+        -   \`package.json\`: Include: \`next\`, \`react\`, \`react-dom\`, \`lucide-react\`, \`framer-motion\`, \`clsx\`, \`tailwind-merge\`, \`tailwindcss-animate\`, \`next-themes\`.
+        -   \`tsconfig.json\`: Standard Next.js config.
+        -   \`next.config.js\`: Standard.
+        -   \`tailwind.config.ts\`: Configure colors, fonts, and animations.
+        -   \`postcss.config.js\`: Standard.
+        -   \`src/app/globals.css\`: Define CSS variables for colors (background, foreground, etc.) and fonts.
 
     2.  **Core App Files**:
-        - \`src/app/layout.tsx\`: Include Inter font, Metadata, and global providers.
-        - \`src/app/globals.css\`: Define comprehensive Tailwind CSS variables (@layer base) for a dark-mode first theme (primary, secondary, accent, background, foreground).
-        - \`src/app/page.tsx\`: The main landing page. MAKE IT IMPRESSIVE. Use Hero sections, Feature grids, and Call-to-Actions.
-    
+        -   \`src/app/layout.tsx\`: Wrap children in \`<ThemeProvider>\` (from \`next-themes\`). Include Fonts.
+        -   \`src/app/providers.tsx\`: Create the ThemeProvider component.
+        -   \`src/app/page.tsx\`: The "Ultra-Premium" Landing Page.
+            -   **Hero**: Big, Bold, Animated.
+            -   **Features**: Bento Grid layout.
+            -   **Testimonials/Showcase**: Horizontal scroll or grid.
+            -   **CTA**: Magnetic button.
+
     3.  **Components** (\`src/components/...\`):
-        - Create a \`src/components/ui\` folder for base elements (Button, Card, Input) using standard patterns.
-        - Create feature-specific components (e.g., \`src/components/landing/Hero.tsx\`).
-        - Use \`lucide-react\` for icons.
-        - Use \`framer-motion\` for subtle entrance animations.
+        -   \`src/components/ui/button.tsx\`: High-end button with hover effects.
+        -   \`src/components/ui/card.tsx\`: Glassmorphism card.
+        -   \`src/components/theme-toggle.tsx\`: Button to switch themes.
+        -   Feature components (Hero, Features, etc.).
 
     4.  **Database**:
-        - \`supabase/migrations/20240101_init.sql\`: Use the SQL provided in the Plan.
-
-    GUIDELINES:
-    - **Code Quality**: Strict TypeScript, no "any" types if possible.
-    - **Import Strategy**: YOU MUST USE RELATIVE IMPORTS (e.g., "../components/ui/button", "../../lib/utils"). DO NOT USE PATH ALIASES (e.g., "@/components/..."). Vercel build will FAIL if you use aliases.
-    - **Styling**: Use \`clsx\` and \`tailwind-merge\` for dynamic classes.
-    - **Theme**: Default to a sophisticated DARK MODE.
-    - **Content**: Use the User Prompt to infer specific text, titles, and features.
+        -   \`supabase/migrations/20240101_init.sql\`: Use the Plan's SQL.
 
     GENERATE A COMPLETE, WORKING REPOSITORY. DO NOT HALLUCINATE MISSING FILES.
     `;
@@ -512,11 +528,37 @@ export default config
       return file;
     });
 
-    // 3. ENFORCE CONFIGURATION FILES (PostCSS, Tailwind, Package.json)
+    // 3. ENFORCE CONFIGURATION FILES (PostCSS, Tailwind, Package.json, TSConfig)
     const MANDATORY_FILES = [
         {
              path: "postcss.config.js",
              content: "module.exports = { plugins: { tailwindcss: {}, autoprefixer: {}, }, }"
+        },
+        {
+             path: "tsconfig.json",
+             content: JSON.stringify({
+               "compilerOptions": {
+                 "lib": ["dom", "dom.iterable", "esnext"],
+                 "allowJs": true,
+                 "skipLibCheck": true,
+                 "strict": true,
+                 "noEmit": true,
+                 "esModuleInterop": true,
+                 "module": "esnext",
+                 "moduleResolution": "bundler",
+                 "resolveJsonModule": true,
+                 "isolatedModules": true,
+                 "jsx": "preserve",
+                 "incremental": true,
+                 "plugins": [{ "name": "next" }],
+                 "baseUrl": ".",
+                 "paths": {
+                   "@/*": ["./src/*"]
+                 }
+               },
+               "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+               "exclude": ["node_modules"]
+             }, null, 2)
         },
         {
              path: "tailwind.config.ts",
@@ -829,78 +871,6 @@ export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
       }
       return file;
     });
-
-    // 3. FORCE OVERRIDE package.json to ensure stable dependencies
-    const correctPackageJson = JSON.stringify({
-      "name": "ai-generated-app",
-      "version": "0.1.0",
-      "private": true,
-      "scripts": {
-        "dev": "next dev",
-        "build": "next build",
-        "start": "next start",
-        "lint": "next lint"
-      },
-      "dependencies": {
-        "react": "^18",
-        "react-dom": "^18",
-        "next": "14.1.0",
-        "lucide-react": "^0.300.0",
-        "framer-motion": "^11.0.0",
-        "class-variance-authority": "^0.7.0",
-        "@radix-ui/react-slot": "^1.0.2",
-        "clsx": "^2.1.0",
-        "tailwind-merge": "^2.2.0",
-        "tailwindcss-animate": "^1.0.7"
-      },
-      "devDependencies": {
-        "typescript": "^5",
-        "@types/node": "^20",
-        "@types/react": "^18",
-        "@types/react-dom": "^18",
-        "autoprefixer": "^10.0.1",
-        "postcss": "^8",
-        "tailwindcss": "^3.3.0"
-      }
-    }, null, 2);
-
-    const packageJsonIndex = result.files.findIndex((f: any) => f.path === "package.json");
-    if (packageJsonIndex !== -1) {
-      result.files[packageJsonIndex].content = correctPackageJson;
-    } else {
-      result.files.push({ path: "package.json", content: correctPackageJson });
-    }
-
-    // 4. FORCE OVERRIDE tsconfig.json (after normalization)
-    const correctTsConfig = JSON.stringify({
-      compilerOptions: {
-        target: "ES2020",
-        lib: ["DOM", "DOM.Iterable", "ESNext"],
-        allowJs: true,
-        skipLibCheck: true,
-        strict: true,
-        noEmit: true,
-        esModuleInterop: true,
-        module: "esnext",
-        moduleResolution: "bundler",
-        resolveJsonModule: true,
-        isolatedModules: true,
-        jsx: "preserve",
-        incremental: true,
-        plugins: [{ "name": "next" }],
-        baseUrl: ".",
-        paths: { "@/*": ["./src/*"] }
-      },
-      include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-      exclude: ["node_modules"]
-    }, null, 2);
-
-    const tsConfigIndex = result.files.findIndex((f: any) => f.path === "tsconfig.json");
-    if (tsConfigIndex !== -1) {
-      result.files[tsConfigIndex].content = correctTsConfig;
-    } else {
-      result.files.push({ path: "tsconfig.json", content: correctTsConfig });
-    }
 
     return NextResponse.json({ files: result.files });
 

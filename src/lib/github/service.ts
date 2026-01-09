@@ -213,12 +213,14 @@ export async function pushFilesToRepo(
     accessToken?: string
 ) {
     try {
+        console.log("Pushing files to repo...");
         const octokit = getOctokit(accessToken);
         
         // Get latest commit sha
         let refData;
         let branch = "main";
         try {
+            console.log("Getting main branch ref...");
             const res = await octokit.rest.git.getRef({
                 owner,
                 repo,
@@ -236,7 +238,9 @@ export async function pushFilesToRepo(
             branch = "master";
         }
         
+        console.log(`Using branch: ${branch}`);
         const latestCommitSha = refData.object.sha;
+        console.log(`Latest commit SHA: ${latestCommitSha}`);
         const { data: latestCommit } = await octokit.rest.git.getCommit({
           owner,
           repo,
@@ -245,6 +249,7 @@ export async function pushFilesToRepo(
         const latestTreeSha = latestCommit.tree.sha;
 
         // Create blobs
+        console.log("Creating blobs...");
         const treeItems = await Promise.all(
             files.map(async (file) => {
                 const { data: blob } = await octokit.rest.git.createBlob({
@@ -263,6 +268,7 @@ export async function pushFilesToRepo(
         );
 
         // Create tree
+        console.log("Creating tree...");
         const { data: tree } = await octokit.rest.git.createTree({
             owner,
             repo,
@@ -271,6 +277,7 @@ export async function pushFilesToRepo(
         });
 
         // Create commit
+        console.log("Creating commit...");
         const { data: newCommit } = await octokit.rest.git.createCommit({
             owner,
             repo,
@@ -280,6 +287,7 @@ export async function pushFilesToRepo(
         });
 
         // Update ref
+        console.log("Updating ref...");
         await octokit.rest.git.updateRef({
             owner,
             repo,
@@ -287,6 +295,7 @@ export async function pushFilesToRepo(
             sha: newCommit.sha,
         });
 
+        console.log("Push success!");
         return { success: true, sha: newCommit.sha };
 
     } catch (error: any) {
