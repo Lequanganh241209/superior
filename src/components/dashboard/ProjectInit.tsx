@@ -12,6 +12,7 @@ export function ProjectInit() {
   const { isInitializing, setInitializing, setProjectDetails, setHighlightedTab, setWorkflow, setGeneratedSQL, setPreviewUrl } = useProjectStore();
   const [input, setInput] = useState("");
   const [projectName, setProjectNameInput] = useState("");
+
   const [deployData, setDeployData] = useState<{ url: string, dashboard: string } | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
 
@@ -67,7 +68,26 @@ export function ProjectInit() {
                     version: "1.0.0",
                     private: true,
                     scripts: { dev: "next dev", build: "next build", start: "next start" },
-                    dependencies: { next: "14.1.0", react: "18.2.0", "react-dom": "18.2.0" }
+                    dependencies: { 
+                        "next": "14.1.0", 
+                        "react": "18.2.0", 
+                        "react-dom": "18.2.0",
+                        "lucide-react": "^0.300.0",
+                        "clsx": "^2.1.0",
+                        "tailwind-merge": "^2.2.0",
+                        "tailwindcss-animate": "^1.0.7",
+                        "class-variance-authority": "^0.7.0",
+                        "@radix-ui/react-slot": "^1.0.2"
+                    },
+                    devDependencies: {
+                        "typescript": "^5",
+                        "@types/node": "^20",
+                        "@types/react": "^18",
+                        "@types/react-dom": "^18",
+                        "autoprefixer": "^10.0.1",
+                        "postcss": "^8",
+                        "tailwindcss": "^3.3.0"
+                    }
                 }, null, 2)
             });
         }
@@ -106,7 +126,9 @@ module.exports = {
                         moduleResolution: "Node",
                         strict: true,
                         esModuleInterop: true,
-                        forceConsistentCasingInFileNames: true
+                        forceConsistentCasingInFileNames: true,
+                        baseUrl: ".",
+                        paths: { "@/*": ["./src/*"] }
                     },
                     include: ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
                     exclude: ["node_modules"]
@@ -374,6 +396,8 @@ module.exports = {
                         placeholder="e.g. quantum-exchange-v1"
                     />
                 </div>
+
+
 
                 <div>
                     <label className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-2">

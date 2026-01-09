@@ -42,11 +42,23 @@ export async function POST(req: NextRequest) {
       walk(base);
     }
 
+    // Force inject vercel.json for better routing/headers
+    const finalFiles = files || workspaceFiles;
+    if (!finalFiles.find((f: { path: string }) => f.path === "vercel.json")) {
+        finalFiles.push({
+            path: "vercel.json",
+            content: JSON.stringify({
+                version: 2,
+                rewrites: [{ source: "/(.*)", destination: "/" }]
+            }, null, 2)
+        });
+    }
+
     const deployResult = await createDeployment({
       name: name.toLowerCase().replace(/\s+/g, "-"),
       repoId,
       repoName,
-      files: files || workspaceFiles,
+      files: finalFiles,
       accessToken
     });
 

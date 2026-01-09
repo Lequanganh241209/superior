@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, ExternalLink } from "lucide-react";
+import { RefreshCw, ExternalLink, ShieldCheck } from "lucide-react";
 import { useProjectStore } from "@/store/project-store";
 
 const OVERRIDES: Record<string, string> = {
@@ -130,34 +130,51 @@ export function Sandbox() {
               </div>
             )}
             {active && (blocked || usingProxy) && (
-              <div className="absolute inset-0 flex items-center justify-center text-zinc-400 z-10 bg-white/80">
-                <div className="text-center space-y-3">
+              <div className="absolute inset-0 flex items-center justify-center text-zinc-400 z-10 bg-white/95">
+                <div className="text-center space-y-4 max-w-md px-6">
+                  <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <ShieldCheck className="w-6 h-6 text-yellow-600" />
+                  </div>
                   {!usingProxy ? (
-                    <p className="font-mono text-sm text-zinc-700">
-                      Trang này không cho phép nhúng iframe (X-Frame-Options/CSP).
-                    </p>
+                    <div>
+                        <h3 className="font-semibold text-zinc-900 mb-1">Bảo Mật Trình Duyệt</h3>
+                        <p className="font-mono text-xs text-zinc-600">
+                          Trang web này không cho phép hiển thị trong khung (iframe) để bảo mật.
+                        </p>
+                    </div>
                   ) : (
-                    <p className="font-mono text-sm text-zinc-700">
-                      Trang này yêu cầu xác thực và có thể không hoạt động qua proxy.
-                    </p>
+                    <div>
+                        <h3 className="font-semibold text-zinc-900 mb-1">Yêu Cầu Xác Thực Vercel</h3>
+                        <p className="font-mono text-xs text-zinc-600">
+                          Bạn đang xem link Preview được bảo vệ bởi Vercel. 
+                          Hệ thống proxy không thể đăng nhập thay bạn.
+                        </p>
+                    </div>
                   )}
-                  <div className="flex items-center justify-center gap-2">
-                    <button 
-                      className="px-3 py-1.5 text-xs rounded-md border border-zinc-300 hover:bg-zinc-100"
-                      onClick={healNow}
-                    >
-                      Thử khôi phục
-                    </button>
+                  
+                  <div className="flex flex-col gap-2">
                     <a 
-                      className="px-3 py-1.5 text-xs rounded-md border border-zinc-300 hover:bg-zinc-100"
+                      className="w-full py-2.5 px-4 bg-primary text-primary-foreground font-medium rounded-md hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                       href={previewUrl!}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Mở tab mới
+                      <ExternalLink className="w-4 h-4" />
+                      Mở Website Trong Tab Mới (Khuyên Dùng)
                     </a>
+                    <button 
+                      className="w-full py-2 px-4 text-xs text-zinc-500 hover:text-zinc-800 underline"
+                      onClick={healNow}
+                    >
+                      Thử tải lại khung xem trước
+                    </button>
                   </div>
-                  {checking && <p className="text-[10px] text-zinc-500">Đang kiểm tra khả năng nhúng…</p>}
+                  
+                  {usingProxy && (
+                      <div className="text-[10px] text-zinc-400 bg-zinc-50 p-2 rounded border border-zinc-100 mt-2">
+                          Mẹo: Sau khi bạn đăng nhập Vercel ở tab mới, quay lại đây và bấm &quot;Thử tải lại&quot; có thể sẽ xem được.
+                      </div>
+                  )}
                 </div>
               </div>
             )}

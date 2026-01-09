@@ -118,9 +118,11 @@ async function deployWithFiles(projectName: string, files: { path: string; conte
         }
 
         // 4. Ensure canonical alias <projectName>.vercel.app points to latest deployment
+        let finalUrl = deployData.url ? `https://${deployData.url}` : "";
         try {
             const deploymentId = deployData.id || deployData.deploymentId;
             if (deploymentId) {
+                const alias = `${projectName}.vercel.app`;
                 const aliasRes = await fetch(`${VERCEL_API_URL}/v13/deployments/${deploymentId}/aliases`, {
                     method: "POST",
                     headers: {
@@ -128,12 +130,12 @@ async function deployWithFiles(projectName: string, files: { path: string; conte
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
-                        alias: `${projectName}.vercel.app`
+                        alias: alias
                     })
                 });
                 // If alias succeeded, prefer the canonical domain
                 if (aliasRes.ok) {
-                    // no need to read body; alias is set
+                    finalUrl = `https://${alias}`;
                 }
             }
         } catch (e) {
@@ -144,7 +146,7 @@ async function deployWithFiles(projectName: string, files: { path: string; conte
             success: true,
             projectId: deployData.projectId,
             projectName: deployData.name,
-            deployUrl: deployData.url ? `https://${deployData.url}` : `https://${deployData.alias?.[0]}`,
+            deployUrl: finalUrl || `https://${projectName}.vercel.app`,
             dashboardUrl: `https://vercel.com${deployData.inspectorUrl || ''}`
         };
 
