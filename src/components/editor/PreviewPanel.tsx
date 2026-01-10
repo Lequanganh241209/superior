@@ -167,25 +167,68 @@ export function PreviewPanel() {
             files["/App.tsx"] = `
 import React from "react";
 import Page from "${importPath}";
-import "./src/app/globals.css"; // IMPORT GLOBALS.CSS TO APPLY THEME VARIABLES
+import "./src/app/globals.css"; 
 
 export default function App() {
-  return <Page />;
+  // SIMULATE ROOT LAYOUT WRAPPER
+  // We apply the classes that are usually in src/app/layout.tsx
+  return (
+    <div className="min-h-screen bg-background font-body antialiased text-foreground selection:bg-indigo-100">
+       <Page />
+    </div>
+  );
 }
 `;
         } else {
             // Fallback if no page.tsx
             files["/App.tsx"] = `export default function App() { return <div style={{padding: 20, color: 'white'}}>No page.tsx found in generated files. Check the Code tab to see what was generated.</div> }`;
         }
+        
+        // --- NEXT.JS SHIM INJECTION (CRITICAL FIX) ---
+        // Iterate through ALL files and replace Next.js imports with shims
+        Object.keys(files).forEach(path => {
+            let content = files[path];
+            
+            // 1. Shim next/link -> Replace with simple <a> tag wrapper
+            if (content.includes('from "next/link"') || content.includes("from 'next/link'")) {
+                 content = content.replace(
+                    /import\s+Link\s+from\s+['"]next\/link['"];?/g, 
+                    `const Link = ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a>;`
+                 );
+            }
+            
+            // 2. Shim next/image -> Replace with simple <img> tag wrapper
+            if (content.includes('from "next/image"') || content.includes("from 'next/image'")) {
+                 content = content.replace(
+                    /import\s+Image\s+from\s+['"]next\/image['"];?/g, 
+                    `const Image = ({ src, alt, ...props }: any) => <img src={src} alt={alt} {...props} />;`
+                 );
+            }
+            
+            // 3. Shim next/navigation (useRouter) -> Mock implementation
+            if (content.includes('from "next/navigation"') || content.includes("from 'next/navigation'")) {
+                 content = content.replace(
+                    /import\s+\{\s*useRouter\s*\}\s+from\s+['"]next\/navigation['"];?/g,
+                    `const useRouter = () => ({ push: () => {}, replace: () => {}, back: () => {} });`
+                 );
+            }
 
+            files[path] = content;
+        });
+        
         // VITE TEMPLATE FIX: Point index.html to App.tsx
         // WE MUST INJECT TAILWIND SCRIPT DIRECTLY INTO HTML TO ENSURE IT LOADS
-        files["/index.html"] = `<!DOCTYPE html>
+        const indexHtmlContent = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preview</title>
+    <!-- PRE-LOAD FONTS FOR LOVABLE DESIGN -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -193,6 +236,10 @@ export default function App() {
         theme: {
           container: { center: true, padding: "2rem", screens: { "2xl": "1400px" } },
           extend: {
+            fontFamily: {
+              heading: ['Outfit', 'sans-serif'],
+              body: ['Inter', 'sans-serif'],
+            },
             colors: {
               border: "hsl(var(--border))", input: "hsl(var(--input))", ring: "hsl(var(--ring))", background: "hsl(var(--background))", foreground: "hsl(var(--foreground))",
               primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
@@ -204,6 +251,20 @@ export default function App() {
               card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
             },
             borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
+            keyframes: {
+                "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
+                "accordion-up": { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } },
+                "fade-in": { "0%": { opacity: "0", transform: "translateY(10px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
+                "fade-out": { "0%": { opacity: "1", transform: "translateY(0)" }, "100%": { opacity: "0", transform: "translateY(10px)" } },
+                "scale-in": { "0%": { transform: "scale(0.95)", opacity: "0" }, "100%": { transform: "scale(1)", opacity: "1" } },
+            },
+            animation: {
+                "accordion-down": "accordion-down 0.2s ease-out",
+                "accordion-up": "accordion-up 0.2s ease-out",
+                "fade-in": "fade-in 0.5s ease-out forwards",
+                "fade-out": "fade-out 0.5s ease-out forwards",
+                "scale-in": "scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+            },
           }
         }
       }
@@ -214,6 +275,9 @@ export default function App() {
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>`;
+        
+        files["/index.html"] = indexHtmlContent;
+        files["/public/index.html"] = indexHtmlContent; // DUPLICATE FOR SAFETY
 
         // REMOVE CONFIG FILES to prevent build errors in Sandpack
         delete files["/postcss.config.js"];
@@ -442,6 +506,15 @@ body {
                         theme="dark"
                         files={sandpackFiles}
                         style={{ height: "100%", width: "100%" }}
+                        options={{
+                            activeFile: "/App.tsx",
+                            initMode: "user-visible",
+                            initModeObserverOptions: { rootMargin: '1000px 0px' },
+                            externalResources: [
+                                "https://cdn.tailwindcss.com",
+                                "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap"
+                            ]
+                        }}
                         customSetup={{
                             dependencies: {
                                 "framer-motion": "^11.0.0",
@@ -507,9 +580,11 @@ body {
                         </div>
                         <ScrollArea className="flex-1">
                             <div className="space-y-0.5 p-2">
-                                {generatedFiles.map((file: any) => (
+                                {generatedFiles.map((file: any, idx: number) => {
+                                    if (!file || !file.path) return null;
+                                    return (
                                     <button
-                                        key={file.path}
+                                        key={file.path || idx}
                                         onClick={() => setSelectedFile(file.path)}
                                         className={cn(
                                             "w-full text-left px-2 py-1.5 text-xs rounded-md flex items-center gap-2 transition-colors",
@@ -519,7 +594,8 @@ body {
                                         <FileCode className="w-3.5 h-3.5" />
                                         <span className="truncate">{file.path.split('/').pop()}</span>
                                     </button>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </ScrollArea>
                     </div>
