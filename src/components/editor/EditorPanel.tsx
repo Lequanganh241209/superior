@@ -86,6 +86,21 @@ export function EditorPanel() {
         createProject(name, userMsg);
     }
 
+    // FAKE THINKING PROCESS (To mimic Lovable)
+    setMessages(prev => [...prev, { role: "assistant", content: "🔍 Analyzing your request..." }]);
+    await new Promise(r => setTimeout(r, 800));
+    setMessages(prev => {
+        const newArr = [...prev];
+        newArr[newArr.length - 1] = { role: "assistant", content: "🎨 Selecting the perfect design system..." };
+        return newArr;
+    });
+    await new Promise(r => setTimeout(r, 1000));
+    setMessages(prev => {
+        const newArr = [...prev];
+        newArr[newArr.length - 1] = { role: "assistant", content: "🏗️ Architecting component structure..." };
+        return newArr;
+    });
+
     try {
         const response = await fetch("/api/ai/codegen", {
             method: "POST",

@@ -397,7 +397,7 @@ const config = {
                 { role: "system", content: systemPrompt },
                 { role: "user", content: `Prompt: ${prompt}\n\nPlan: ${plan.description}\n\nREMEMBER: You are the "${selectedPersona.name}" Persona. DESIGN ACCORDINGLY.` },
                 // RANDOM SEED to force variety in code structure
-                { role: "system", content: `SEED: ${Date.now()}-${Math.random()}` }
+                { role: "system", content: `SEED: ${Date.now()}-${Math.random()}-FORCE_VARIATION` }
               ],
               model: "gpt-4o",
               response_format: { type: "json_object" },

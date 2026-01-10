@@ -415,7 +415,7 @@ body {
                 (previewUrl === "sandpack" || (!previewUrl && hasFiles)) ? (
                     <SandpackProvider 
                         key={key}
-                        template="vite-react-ts"
+                        template="react-ts" // SWITCHED TO STANDARD REACT-TS FOR STABILITY
                         theme="dark"
                         files={sandpackFiles}
                         style={{ height: "100%", width: "100%" }}
@@ -442,16 +442,11 @@ body {
                                 "recharts": "^2.12.0",
                                 "date-fns": "^3.3.1"
                             },
-                            externalResources: [
-                                "https://cdn.tailwindcss.com",
-                                "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-                            ]
                         }}
                         options={{
                             activeFile: "/App.tsx",
-                            initMode: "lazy", // Changed from user-visible to lazy to avoid timeout on weak connections
+                            initMode: "user-visible",
                             initModeObserverOptions: { rootMargin: '1000px 0px' },
-                            bundlerURL: "https://sandpack-bundler.codesandbox.io", // Explicitly use official bundler
                         }}
                     >
                         <SandpackLayout style={{ height: "100%", width: "100%", borderRadius: 0, border: "none" }}>
