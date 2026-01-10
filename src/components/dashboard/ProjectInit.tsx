@@ -35,28 +35,7 @@ export function ProjectInit() {
         if (!res.ok || data?.error) throw new Error(data?.error || `HTTP ${res.status}`);
         return data;
     };
-    const fallbackPlan = {
-        sql: "CREATE TABLE items (id serial primary key, name text, created_at timestamptz default now());",
-        nodes: [
-            { id: 'ui', type: 'custom', position: { x: 120, y: 100 }, data: { label: 'UI', type: 'frontend' } },
-            { id: 'api', type: 'custom', position: { x: 360, y: 100 }, data: { label: 'API', type: 'backend' } },
-            { id: 'db', type: 'custom', position: { x: 360, y: 280 }, data: { label: 'DB', type: 'database' } }
-        ],
-        edges: [
-            { id: 'e1', source: 'ui', target: 'api', animated: true },
-            { id: 'e2', source: 'api', target: 'db', animated: true }
-        ],
-        description: "Fallback architecture plan"
-    };
-    const fallbackFiles = [
-        { path: "package.json", content: JSON.stringify({ name: slug || "aether-app", version: "1.0.0", private: true, scripts: { dev: "next dev", build: "next build", start: "next start" }, dependencies: { next: "14.1.0", react: "18.2.0", "react-dom": "18.2.0" } }, null, 2) },
-        { path: "src/app/layout.tsx", content: "export default function RootLayout({ children }: { children: React.ReactNode }) { return (<html lang=\"en\"><body>{children}</body></html>); }" },
-        { path: "src/app/page.tsx", content: "export default function Home(){return(<main style={{padding:24,fontFamily:'ui-sans-serif'}}><h1>System Online</h1><p>Fallback build deployed successfully.</p></main>)}" },
-        { path: "tsconfig.json", content: JSON.stringify({ compilerOptions: { target: "ES2020", lib: ["DOM", "ES2020"], jsx: "preserve", moduleResolution: "Node", strict: true, esModuleInterop: true, forceConsistentCasingInFileNames: true }, include: ["next-env.d.ts", "**/*.ts", "**/*.tsx"], exclude: ["node_modules"] }, null, 2) },
-        { path: "next-env.d.ts", content: "/// <reference types=\"next\" />\n/// <reference types=\"next/image-types/global\" />" },
-        { path: "src/app/globals.css", content: "html,body{margin:0;padding:0}*,*:before,*:after{box-sizing:border-box}" },
-        { path: "next.config.js", content: "module.exports={reactStrictMode:true,async headers(){return[{source:'/(:?)(.*)',headers:[{key:'Content-Security-Policy',value:'frame-ancestors *'}]}]}}"}
-    ];
+    
     const ensureRequiredFiles = (files: { path: string; content: string }[]) => {
         const out = [...files];
         const upsert = (filePath: string, content: string) => {
@@ -248,8 +227,7 @@ Card.displayName = "Card"
         try {
             plan = await parse(planRes);
         } catch (e: any) {
-            addLog("Plan service unavailable. Using fallback plan.");
-            plan = fallbackPlan;
+             throw new Error("Plan generation failed. Please check your API keys or try again.");
         }
         
         addLog("Blueprint Generated: SQL Schema & Workflow Nodes Ready.");
@@ -275,8 +253,7 @@ Card.displayName = "Card"
         try {
             codeData = await parse(codeRes);
         } catch (e: any) {
-            addLog("Codegen service unavailable. Using fallback source.");
-            codeData = { files: fallbackFiles };
+            throw new Error("Code generation failed. Please check your API keys or try again.");
         }
         
         const ensuredFiles = ensureRequiredFiles(codeData.files).map((file) => {

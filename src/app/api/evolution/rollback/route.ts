@@ -1,36 +1,29 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextResponse } from "next/server";
 import { revertCommit } from "@/lib/github/service";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const { repoName, sha } = await req.json();
 
     if (!repoName || !sha) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        return NextResponse.json({ error: "Missing repoName or sha" }, { status: 400 });
     }
 
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const [owner, repo] = repoName.split('/');
+    if (!owner || !repo) {
+        return NextResponse.json({ error: "Invalid repo name format" }, { status: 400 });
     }
 
-    const [owner, repo] = repoName.split("/");
-
-    // 2. Perform Rollback
-    // Use User's PAT or Admin PAT fallback inside service
     const result = await revertCommit(owner, repo, sha);
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
+        return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, newSha: result.sha });
+    return NextResponse.json({ success: true, sha: result.sha });
 
   } catch (error: any) {
     console.error("Rollback API Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Error" }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

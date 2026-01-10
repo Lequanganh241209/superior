@@ -1,323 +1,254 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { Rocket, Box, Layers, Activity, Cpu, Settings, Github, Zap, GitBranch, LogOut, FolderOpen } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { ProjectInit } from "@/components/dashboard/ProjectInit";
-import { Sandbox } from "@/components/preview/Sandbox";
-import { EvolutionDashboard } from "@/components/dashboard/Evolution";
-import { DatabaseArchitect } from "@/components/dashboard/DatabaseArchitect";
-import { VisualWorkflow } from "@/components/dashboard/VisualWorkflow";
-import { SmartBilling } from "@/components/billing/SmartBilling";
-import { useProjectStore } from "@/store/project-store";
-import { supabase } from "@/lib/supabase/client";
-import { toast } from "sonner";
+import { ArrowRight, Sparkles, Zap, Shield, Cpu, Code2, Globe, Database, Terminal, ChevronRight, Activity, Box } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
-interface Project {
-  id: string;
-  name: string;
-// Trigger Vercel Deploy: Env Vars Added
-  repo_name: string;
-  deployment_url: string;
-  // Environment Variable Fix: VERCEL_ACCESS_TOKEN
-  status: string;
+// --- Components ---
+
+function Hero() {
+  return (
+    <section className="relative min-h-screen flex items-center overflow-hidden bg-[#050505] selection:bg-cyan-500/30">
+      {/* Abstract Cyber Grid */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:60px_60px] opacity-[0.05]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_50%_-30%,#1e1e2e,transparent)]" />
+      
+      <div className="container relative z-10 px-4 md:px-6 pt-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className="space-y-8">
+            <div className="inline-flex items-center space-x-2 border border-cyan-900/30 bg-cyan-950/10 px-3 py-1 text-xs font-mono text-cyan-400 backdrop-blur-md">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+              </span>
+              <span>SYSTEM_READY_V2.2</span>
+            </div>
+
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white leading-[1.1]">
+              CONSTRUCT <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">THE IMPOSSIBLE</span>
+            </h1>
+
+            <p className="text-lg text-zinc-400 max-w-xl font-light border-l-2 border-zinc-800 pl-6">
+              An autonomous neural architect that doesn&apos;t just write code—it engineers entire digital ecosystems.
+              <span className="block mt-2 text-zinc-500 font-mono text-sm">{"// NO_HUMAN_INTERVENTION_REQUIRED"}</span>
+            </p>
+
+            <div className="flex flex-wrap gap-4">
+              <Link href="/dashboard">
+                <Button className="h-14 px-8 bg-white text-black hover:bg-cyan-50 font-bold rounded-none skew-x-[-10deg] transition-all hover:translate-y-[-2px] hover:shadow-[0_0_20px_rgba(34,211,238,0.4)]">
+                  <span className="skew-x-[10deg] flex items-center">
+                    INITIALIZE PROJECT <ArrowRight className="ml-2 w-4 h-4" />
+                  </span>
+                </Button>
+              </Link>
+              <Link href="#demo">
+                <Button variant="outline" className="h-14 px-8 border-zinc-800 text-zinc-300 hover:bg-zinc-900/50 hover:text-white hover:border-cyan-500/50 font-mono rounded-none skew-x-[-10deg]">
+                  <span className="skew-x-[10deg]">VIEW_BLUEPRINT</span>
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Isometric Terminal Visual */}
+          <div className="relative hidden lg:block">
+            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-cyan-500/5 blur-[100px]" />
+            <div className="relative z-10 transform rotate-[-5deg] hover:rotate-0 transition-transform duration-700 ease-out">
+              <div className="bg-[#0a0a0a] border border-white/10 rounded-lg shadow-2xl overflow-hidden backdrop-blur-xl">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/5">
+                  <div className="flex space-x-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50" />
+                    <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
+                    <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50" />
+                  </div>
+                  <div className="text-xs font-mono text-zinc-500">aether_core.tsx</div>
+                </div>
+                <div className="p-6 font-mono text-sm space-y-4">
+                  <div className="flex gap-4 text-zinc-500">
+                    <span>01</span>
+                    <span className="text-purple-400">import</span> <span className="text-white">{"{ Autonomous }"}</span> <span className="text-purple-400">from</span> <span className="text-green-400">&quot;@aether/mind&quot;</span>;
+                  </div>
+                  <div className="flex gap-4 text-zinc-500">
+                    <span>02</span>
+                    <span className="text-blue-400">const</span> <span className="text-yellow-400">App</span> = <span className="text-blue-400">await</span> <span className="text-white">Aether.construct</span>({"{ result: 'Perfect' }"});
+                  </div>
+                  <div className="flex gap-4 text-zinc-500 opacity-50">
+                    <span>03</span>
+                    <span>{"// Optimizing neural pathways..."}</span>
+                  </div>
+                  <div className="flex gap-4 text-zinc-500">
+                     <span>04</span>
+                     <span className="text-green-400">✓ System Generated in 400ms</span>
+                  </div>
+                  <div className="mt-8 p-4 bg-zinc-900/50 border-l-2 border-cyan-500 text-cyan-400 text-xs">
+                    {">"} DEPLOYMENT_COMPLETE: https://production.aether.os
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
-const OVERRIDES: Record<string, string> = {
-  writingtask2: "https://writingtask2-646deiwnu-le-quang-tons-projects.vercel.app"
-};
-const overrideFor = (p: Project) => {
-  const key1 = (p.name || "").toLowerCase();
-  const tail = (p.repo_name || "").split("/").pop() || "";
-  const key2 = tail.toLowerCase();
-  return OVERRIDES[key1] || OVERRIDES[key2] || null;
-};
-const healPreview = async (p: Project) => {
-  const ov = overrideFor(p);
-  if (ov) return ov;
-  if ((p.deployment_url || "").toLowerCase().includes("writingtask2.vercel.app")) {
-    return OVERRIDES.writingtask2;
-  }
-  try {
-    const head = await fetch(p.deployment_url, { method: "HEAD" });
-    if (head.ok) return p.deployment_url;
-    const refetch = await fetch("/api/projects/list");
-    if (refetch.ok) {
-      const refreshed = await refetch.json();
-      const match =
-        refreshed.projects?.find((x: any) => x.repo_name === p.repo_name) ||
-        refreshed.projects?.[0];
-      if (match?.deployment_url) return match.deployment_url;
-    }
-  } catch {}
-  return p.deployment_url;
-};
-
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState("init");
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  // Default to true to prevent flash of login screen, but fail open if needed
-  const [hasSession, setHasSession] = useState<boolean>(true); 
-  
-  const { projectName, setProjectDetails, highlightedTab, setHighlightedTab } = useProjectStore();
-  const router = useRouter();
-
-  useEffect(() => {
-    // FORCE TIMEOUT: Stop loading after 1s no matter what
-    const forceTimer = setTimeout(() => setIsLoading(false), 1000);
-
-    const checkUser = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) throw error;
-
-        if (session) {
-           setUser(session.user);
-           setHasSession(true);
-           setIsLoading(false); // Immediate unlock
-        } else {
-           // Double check - sometimes getSession is stale
-           setHasSession(false);
-        }
-
-        // Background Data Load - Completely Independent
-        if (session) {
-            try {
-                const res = await fetch('/api/projects/list');
-                if (res.ok) {
-                    const json = await res.json();
-                    const list = json.projects || [];
-                    setProjects(list);
-                    if (list.length > 0 && !projectName) {
-                        setProjectDetails(list[0].repo_name, `https://github.com/${list[0].repo_name}`);
-                        try {
-                          const fixed = await healPreview(list[0]);
-                          useProjectStore.getState().setPreviewUrl(fixed);
-                        } catch {}
-                    }
-                }
-            } catch {}
-        }
-      } catch (err: any) {
-         // Ignore AbortError from Supabase client (common during rapid nav/reloads)
-         if (err.name === 'AbortError' || err.message?.includes('AbortError')) {
-            return;
-         }
-         console.error("Auth check failed:", err);
-         setIsLoading(false);
-      }
-    };
-
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
-       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-          setUser(session?.user);
-          setHasSession(true);
-          setIsLoading(false);
-       } else if (event === "SIGNED_OUT") {
-          setHasSession(false);
-          setIsLoading(false);
-          // Only redirect if explicitly signed out
-          if (typeof window !== "undefined") {
-             window.location.href = "/login";
-          }
-       }
-    });
-
-    return () => {
-       subscription.unsubscribe();
-       clearTimeout(forceTimer);
-    };
-  }, [projectName, setProjectDetails]);
-
-  useEffect(() => {
-    setActiveTab(highlightedTab);
-  }, [highlightedTab]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
-  };
-
-  if (isLoading) return <div className="flex h-screen items-center justify-center bg-black text-primary">Loading Neural Core...</div>;
-  if (!hasSession) return (
-    <div className="flex h-screen items-center justify-center bg-black">
-      <a href="/login" className="px-4 py-2 bg-primary text-primary-foreground rounded">Go to Login</a>
+function FeatureCard({ icon: Icon, title, description, index }: { icon: any, title: string, description: string, index: string }) {
+  return (
+    <div className="group relative bg-[#0a0a0a] border border-white/5 hover:border-cyan-500/30 transition-all duration-300 p-8">
+      {/* Corner Accents */}
+      <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-zinc-700 group-hover:border-cyan-500 transition-colors" />
+      <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-zinc-700 group-hover:border-cyan-500 transition-colors" />
+      
+      <div className="flex justify-between items-start mb-6">
+        <div className="p-3 bg-zinc-900 group-hover:bg-cyan-950/30 transition-colors">
+          <Icon className="w-6 h-6 text-zinc-400 group-hover:text-cyan-400 transition-colors" />
+        </div>
+        <span className="font-mono text-xs text-zinc-600 group-hover:text-cyan-500/50">[{index}]</span>
+      </div>
+      
+      <h3 className="text-xl font-bold text-white mb-3 tracking-tight group-hover:text-cyan-100 transition-colors">{title}</h3>
+      <p className="text-zinc-400 text-sm leading-relaxed">{description}</p>
     </div>
   );
+}
+
+function Features() {
+  const features = [
+    { icon: Cpu, title: "Neural Architecture", description: "Unlike simple LLMs, Aether plans entire system topology before writing a single line of code." },
+    { icon: Shield, title: "Self-Healing Runtimes", description: "Detected errors are patched in real-time by the overseer agent without downtime." },
+    { icon: Globe, title: "Global Edge Deploy", description: "Instant propagation to 300+ edge locations via our proprietary CDN network." },
+    { icon: Database, title: "Vector Databases", description: "Built-in embeddings and semantic search capabilities for next-gen AI apps." },
+    { icon: Code2, title: "Clean Export", description: "Zero vendor lock-in. Eject to standard Next.js + Supabase stack anytime." },
+    { icon: Zap, title: "Hyper-Speed Build", description: "From prompt to production-grade application in under 60 seconds." }
+  ];
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)]">
-      {/* Sidebar Navigation */}
-      <aside className="w-64 border-r border-border/40 bg-background/95 hidden md:flex flex-col">
-        <nav className="flex flex-col gap-1 p-4 flex-1">
-          <div className="mb-4 px-2 flex items-center justify-between">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Autonomous Core
-            </div>
-            {projects.length > 0 && (
-                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">{projects.length} Projects</span>
-            )}
+    <section id="features" className="py-32 bg-[#050505] border-t border-white/5">
+      <div className="container px-4 md:px-6">
+        <div className="flex flex-col md:flex-row justify-between items-end mb-20 gap-8">
+          <div>
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">
+              SYSTEM <span className="text-zinc-600">CAPABILITIES</span>
+            </h2>
+            <p className="text-zinc-400 max-w-md">
+              Engineered for the next generation of software architects.
+            </p>
           </div>
-
-          {[
-            { id: "init", label: "New Project", icon: Rocket },
-            { id: "workflow", label: "Workflow Canvas", icon: GitBranch },
-            { id: "database", label: "Visual Architect", icon: Layers },
-            { id: "preview", label: "Sandbox Preview", icon: Box },
-            { id: "evolution", label: "Evolution X", icon: Activity },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => { setActiveTab(item.id); setHighlightedTab(item.id as any); }}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all",
-                activeTab === item.id
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
-              )}
-            >
-              <item.icon className="w-4 h-4" />
-              {item.label}
-            </button>
-          ))}
-
-          {projects.length > 0 && (
-            <div className="mt-6 mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Your Projects
-            </div>
-          )}
-          <div className="flex-1 overflow-y-auto max-h-[200px] space-y-1">
-             {projects.map(p => (
-                 <button 
-                    key={p.id}
-                    onClick={() => {
-                        setProjectDetails(p.repo_name, `https://github.com/${p.repo_name}`);
-                        (async () => {
-                          try {
-                            const fixed = await healPreview(p);
-                            useProjectStore.getState().setPreviewUrl(fixed);
-                          } catch {
-                            useProjectStore.getState().setPreviewUrl(p.deployment_url);
-                          }
-                        })();
-                        toast.success(`Switched to ${p.name}`);
-                    }}
-                    className={cn(
-                        "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all w-full truncate",
-                        projectName?.includes(p.repo_name) 
-                            ? "text-primary bg-primary/5" 
-                            : "text-muted-foreground hover:text-foreground"
-                    )}
-                 >
-                    <FolderOpen className="w-3 h-3" />
-                    <span className="truncate">{p.name}</span>
-                 </button>
-             ))}
-          </div>
-
-          <div className="mt-4 mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Enterprise
-          </div>
-          <button 
-             onClick={() => setActiveTab('billing')}
-             className={cn(
-                "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all w-full",
-                activeTab === 'billing' 
-                    ? "bg-accent/10 text-accent border border-accent/20"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
-             )}
-          >
-             <Zap className="w-4 h-4" /> Smart Billing
-          </button>
-          
-          <div className="mt-auto pt-4 border-t border-border/40">
-             <div className="px-2 mb-2 flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary to-blue-500" />
-                <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate text-foreground">{user?.email}</p>
-                    <p className="text-[10px] text-muted-foreground">Architect Level 1</p>
-                </div>
-                <button onClick={handleLogout} className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded transition-colors">
-                    <LogOut className="w-4 h-4" />
-                </button>
-             </div>
-          </div>
-        </nav>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-grid-white/[0.02]">
-        <div className="max-w-6xl mx-auto p-8 space-y-8">
-            <header className="flex items-center justify-between pb-6 border-b border-border/40">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-                        {activeTab === 'init' && "Project Initialization"}
-                        {activeTab === 'workflow' && "Visual Workflow Canvas"}
-                        {activeTab === 'preview' && "Live Sandbox Environment"}
-                        {activeTab === 'evolution' && "Evolution Dashboard"}
-                        {activeTab === 'database' && "Database Architecture"}
-                        {activeTab === 'billing' && "Enterprise Billing"}
-                    </h1>
-                    <p className="text-muted-foreground mt-1 text-sm">
-                        Aether OS V2.2 (Hardened) / Main / {activeTab}
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-xs font-mono text-accent">
-                        <Cpu className="w-3.5 h-3.5" />
-                        <span>AI: GPT-4 Turbo</span>
-                    </div>
-                </div>
-            </header>
-
-            <div className="min-h-[500px]">
-                {activeTab === "init" && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                        <ProjectInit />
-                    </motion.div>
-                )}
-                
-                {activeTab === "workflow" && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                        <VisualWorkflow />
-                    </motion.div>
-                )}
-
-                {activeTab === "preview" && (
-                    <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
-                        <Sandbox />
-                    </motion.div>
-                )}
-
-                {activeTab === "evolution" && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                        <EvolutionDashboard />
-                    </motion.div>
-                )}
-                
-                {activeTab === "database" && (
-                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                        <DatabaseArchitect />
-                     </motion.div>
-                )}
-
-                {activeTab === "billing" && (
-                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                        <SmartBilling />
-                     </motion.div>
-                )}
-            </div>
+          <div className="hidden md:block w-32 h-[1px] bg-gradient-to-r from-transparent to-cyan-500" />
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {features.map((f, i) => (
+            <FeatureCard key={i} {...f} index={`0${i+1}`} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Stats() {
+  return (
+    <section className="py-24 bg-zinc-900/30 border-y border-white/5">
+      <div className="container px-4 md:px-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
+          {[
+            { label: "LINES_GENERATED", value: "10M+" },
+            { label: "ACTIVE_NODES", value: "8,240" },
+            { label: "UPTIME", value: "99.99%" },
+            { label: "AVG_BUILD_TIME", value: "4.2s" },
+          ].map((stat, i) => (
+            <div key={i} className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-white mb-2 font-mono">{stat.value}</div>
+              <div className="text-xs text-zinc-500 tracking-widest">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CTA() {
+  return (
+    <section className="py-32 bg-[#050505] relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-900/20 via-black to-black z-0" />
+      
+      <div className="container relative z-10 px-4 md:px-6 text-center">
+        <div className="max-w-3xl mx-auto space-y-8 border border-white/10 bg-black/50 backdrop-blur-sm p-12">
+          <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tighter">
+            INITIALIZE SEQUENCE?
+          </h2>
+          <p className="text-lg text-zinc-400">
+            Join the collective of architects building the future.
+          </p>
+          <div className="flex justify-center">
+            <Link href="/dashboard">
+              <Button size="lg" className="h-16 px-12 text-lg bg-cyan-600 text-black hover:bg-cyan-500 font-bold rounded-none transition-all">
+                EXECUTE LAUNCH <ChevronRight className="ml-2 w-5 h-5" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="py-12 bg-black border-t border-white/10 text-sm font-mono">
+      <div className="container px-4 md:px-6">
+        <div className="flex flex-col md:flex-row justify-between items-center text-zinc-600">
+          <div className="flex items-center space-x-2 mb-4 md:mb-0">
+            <div className="w-3 h-3 bg-cyan-900 flex items-center justify-center">
+                <div className="w-1.5 h-1.5 bg-cyan-500" />
+            </div>
+            <span>AETHER_OS © 2024</span>
+          </div>
+          <div className="flex space-x-8">
+            <span className="hover:text-cyan-500 cursor-pointer transition-colors">PROTOCOL</span>
+            <span className="hover:text-cyan-500 cursor-pointer transition-colors">LEGAL</span>
+            <span className="hover:text-cyan-500 cursor-pointer transition-colors">STATUS</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <div className="min-h-screen bg-[#050505] text-white selection:bg-cyan-500/30">
+      <header className="fixed top-0 z-50 w-full border-b border-white/5 bg-[#050505]/80 backdrop-blur-xl">
+        <div className="container flex h-16 items-center justify-between px-4 md:px-6">
+          <div className="flex items-center space-x-2 font-bold text-xl tracking-tighter">
+            <Activity className="w-5 h-5 text-cyan-500" />
+            <span className="tracking-[0.2em]">AETHER</span>
+          </div>
+          
+          <div className="flex items-center space-x-6">
+            <Link href="/login" className="text-xs font-mono text-zinc-400 hover:text-cyan-400 transition-colors hidden sm:block">
+              [ ACCESS_TERMINAL ]
+            </Link>
+            <Link href="/dashboard">
+              <Button size="sm" className="bg-white text-black hover:bg-zinc-200 rounded-none font-bold text-xs px-6">
+                START_ENGINE
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <Hero />
+        <Stats />
+        <Features />
+        <CTA />
       </main>
+
+      <Footer />
     </div>
   );
 }

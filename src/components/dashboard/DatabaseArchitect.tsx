@@ -10,7 +10,14 @@ export function DatabaseArchitect() {
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedSQL, setGeneratedSQL] = useState<string | null>(null);
-  const { generatedSQL: globalSQL, setGeneratedSQL: setGlobalSQL } = useProjectStore();
+  const { 
+      generatedSQL: globalSQL, 
+      setGeneratedSQL: setGlobalSQL,
+      generatedFiles,
+      setGeneratedFiles,
+      activeProjectId,
+      updateProjectFiles
+  } = useProjectStore();
 
   useEffect(() => {
     if (globalSQL) {
@@ -22,6 +29,14 @@ export function DatabaseArchitect() {
       const newSQL = e.target.value;
       setGeneratedSQL(newSQL);
       setGlobalSQL(newSQL); // Sync to global store
+      
+      // Update the file in the project as user types
+      const sqlPath = "supabase/migrations/20240520000000_init.sql";
+      const newFiles = [...generatedFiles.filter((f: any) => f.path !== sqlPath), { path: sqlPath, content: newSQL }];
+      setGeneratedFiles(newFiles);
+      if (activeProjectId) {
+          updateProjectFiles(activeProjectId, newFiles);
+      }
   };
 
   const handleGenerate = async () => {
@@ -42,6 +57,16 @@ export function DatabaseArchitect() {
             setGeneratedSQL(data.sql);
             // Also sync to global store so other components can see it
             useProjectStore.getState().setGeneratedSQL(data.sql);
+            
+            // REAL: Save as a file in the project
+            const sqlPath = "supabase/migrations/20240520000000_init.sql";
+            const newFiles = [...generatedFiles.filter((f: any) => f.path !== sqlPath), { path: sqlPath, content: data.sql }];
+            
+            setGeneratedFiles(newFiles);
+            if (activeProjectId) {
+                updateProjectFiles(activeProjectId, newFiles);
+            }
+
             if (data.nodes && data.edges) {
                  useProjectStore.getState().setWorkflow({ nodes: data.nodes, edges: data.edges });
             }

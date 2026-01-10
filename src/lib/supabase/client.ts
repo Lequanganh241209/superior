@@ -40,6 +40,12 @@ function createLocalClient() {
         return { error: null }
       },
       async getSession() {
+        if (typeof window !== 'undefined') {
+            try {
+              const raw = window.localStorage.getItem('dev_session') || 'null'
+              session = JSON.parse(raw)
+            } catch {}
+        }
         return { data: { session }, error: null }
       },
       onAuthStateChange(cb: (event: string, session: any) => void) {
@@ -61,4 +67,28 @@ function createLocalClient() {
   } as any
 }
 
-export const supabase = valid ? createBrowserClient(supabaseUrl, supabaseAnonKey) : createLocalClient()
+export const supabase = (function() {
+  // Check for explicit local mode override
+  let isLocalMode = false;
+  if (typeof window !== 'undefined') {
+    try {
+      isLocalMode = window.localStorage.getItem('aether_use_local_mode') === 'true' || 
+                    document.cookie.includes('aether_local_mode=true');
+    } catch {}
+  }
+
+  if (valid && !isLocalMode) {
+    return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        // Fix for "AbortError: signal is aborted without reason" in dev mode
+        // This overrides the default lock mechanism which causes issues with Next.js hot reload
+        lock: typeof window !== 'undefined' ? (async (name: string, ...args: any[]) => {
+            const callback = args[args.length - 1];
+            return callback();
+        }) as any : undefined,
+      },
+    })
+  } else {
+    return createLocalClient()
+  }
+})();

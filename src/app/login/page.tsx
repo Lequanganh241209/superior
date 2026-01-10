@@ -3,61 +3,79 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, Command } from "lucide-react";
+import { Loader2, Command, ArrowRight, Github, Mail, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { z } from "zod";
+
+const authSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false); // Toggle between Login and SignUp
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      try {
-        const pre = await fetch('/api/auth/precheck');
-        if (pre.ok) {
-          const json = await pre.json();
-          if (json.allowed === false) {
-            toast.error("Sign-up closed: monthly cap reached (100). Please try next month.");
-            setIsLoading(false);
-            return;
-          }
-        }
-      } catch {}
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    // 1. Validation
+    const validation = authSchema.safeParse({ email, password });
+    if (!validation.success) {
+      toast.error((validation.error as any).errors[0].message);
+      setIsLoading(false);
+      return;
+    }
 
-      if (error) {
-        // If login fails, try signup (dev convenience)
+    try {
+      // 2. Precheck (Only for Sign Up)
+      if (isSignUp) {
+        try {
+            const pre = await fetch('/api/auth/precheck');
+            if (pre.ok) {
+            const json = await pre.json();
+            if (json.allowed === false) {
+                toast.error("Sign-up closed: monthly cap reached (100). Please try next month.");
+                setIsLoading(false);
+                return;
+            }
+            }
+        } catch {}
+      }
+
+      let error;
+      
+      if (isSignUp) {
         const { error: signUpError } = await supabase.auth.signUp({
             email,
             password,
         });
-        
-        if (signUpError) throw error; // Throw original login error if signup also fails
-        // Attempt login immediately after signup (for dev without email confirmation)
-        const { error: loginAfterSignupError } = await supabase.auth.signInWithPassword({ email, password });
-        if (loginAfterSignupError) {
-          toast.success("Account created! Please verify email or try logging in again.");
-          setIsLoading(false);
-          return;
-        }
-        toast.success("Welcome, account created and logged in.");
-        if (typeof window !== "undefined") {
-          window.location.href = "/";
+        error = signUpError;
+        if (!error) {
+            toast.success(
+              "Account created! Please check your email to confirm. (Note: On Free Tier, email delivery might be slow. You can use 'Local Mode' to bypass.)",
+              { duration: 6000 }
+            );
         }
       } else {
-        toast.success("Welcome back, Architect.");
-        if (typeof window !== "undefined") {
-          window.location.href = "/";
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        error = signInError;
+        if (!error) {
+            toast.success("Welcome back, Architect.");
+            router.push("/dashboard");
         }
       }
+
+      if (error) throw error;
 
     } catch (error: any) {
       if (error.name === 'AbortError' || error.message?.includes('AbortError')) return;
@@ -65,6 +83,21 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleLocalMode = () => {
+    // Set Local/Demo Mode Cookie and LocalStorage
+    document.cookie = "aether_local_mode=true; path=/; max-age=31536000"; // 1 year
+    window.localStorage.setItem("aether_use_local_mode", "true");
+    
+    // Auto-login logic for local mode
+    const mockSession = { user: { id: 'dev-user', email: 'architect@aether.os' } };
+    window.localStorage.setItem('dev_session', JSON.stringify(mockSession));
+    
+    toast.success("Switched to Local/Demo Mode. Initializing...");
+    
+    // Force a hard navigation to Dashboard to ensure all client/server states align
+    window.location.href = "/dashboard";
   };
 
   const handleGitHubLogin = async () => {
@@ -85,73 +118,114 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-white selection:bg-primary/20">
-      <div className="w-full max-w-md p-8 space-y-8 bg-zinc-900/50 border border-white/10 rounded-xl backdrop-blur-xl">
+    <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-purple-900/20 via-black to-black z-0" />
+      <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:30px_30px] z-0" />
+
+      <div 
+        className="w-full max-w-md p-8 space-y-8 bg-zinc-900/50 border border-white/10 rounded-2xl backdrop-blur-2xl relative z-10 shadow-2xl"
+      >
         <div className="text-center space-y-2">
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Command className="w-6 h-6 text-primary" />
+          <div 
+            className="flex justify-center mb-6"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                <Command className="w-8 h-8 text-white" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Aether OS Access</h1>
-          <p className="text-sm text-zinc-400">Enter your credentials to access the Neural Core.</p>
+          <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
+            {isSignUp ? "Initialize Core" : "Welcome Back"}
+          </h1>
+          <p className="text-sm text-zinc-400">
+            {isSignUp ? "Create your neural identity." : "Authenticate to access the Neural Core."}
+          </p>
         </div>
 
         <div className="space-y-4">
-          <button
+          <Button
             onClick={handleGitHubLogin}
             disabled={isLoading}
-            className="w-full py-2.5 bg-white text-black rounded-lg text-sm font-bold hover:bg-gray-200 transition-all flex items-center justify-center gap-2"
+            variant="outline"
+            className="w-full h-12 bg-white text-black hover:bg-zinc-200 border-none font-semibold text-base relative overflow-hidden group"
           >
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+            <Github className="w-5 h-5 mr-2" />
             Continue with GitHub
-          </button>
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+          </Button>
           
+          <Button
+            onClick={handleLocalMode}
+            disabled={isLoading}
+            variant="ghost"
+            className="w-full h-10 bg-zinc-800/50 text-zinc-300 hover:bg-zinc-800 hover:text-white border border-white/5 transition-all"
+          >
+            Enter Local / Demo Mode
+          </Button>
+
           <div className="relative">
              <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-white/10" />
              </div>
              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-zinc-900 px-2 text-zinc-500">Or continue with email</span>
+                <span className="bg-zinc-900/50 px-2 text-zinc-500 backdrop-blur-sm">Or use email</span>
              </div>
           </div>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <label className="text-xs font-medium uppercase text-zinc-500">Email Identity</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-              placeholder="architect@aether.os"
-            />
+            <label className="text-xs font-medium uppercase text-zinc-500 tracking-wider">Email Identity</label>
+            <div className="relative group">
+                <Mail className="absolute left-3 top-2.5 w-4 h-4 text-zinc-500 group-focus-within:text-purple-400 transition-colors" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                  placeholder="architect@aether.os"
+                />
+            </div>
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-medium uppercase text-zinc-500">Passphrase</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-              placeholder="••••••••"
-            />
+            <label className="text-xs font-medium uppercase text-zinc-500 tracking-wider">Passphrase</label>
+            <div className="relative group">
+                <Lock className="absolute left-3 top-2.5 w-4 h-4 text-zinc-500 group-focus-within:text-purple-400 transition-colors" />
+                <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                placeholder="••••••••"
+                />
+            </div>
           </div>
 
-          <button
+          <Button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-all flex items-center justify-center gap-2"
+            className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium text-base shadow-lg shadow-purple-900/20"
           >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Authenticate"}
-          </button>
+            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                <span className="flex items-center">
+                    {isSignUp ? "Create Identity" : "Authenticate"} <ArrowRight className="ml-2 w-4 h-4" />
+                </span>
+            )}
+          </Button>
         </form>
         
-        <div className="text-center text-xs text-zinc-600">
-            Aether OS V2.0 Autonomous Architecture
+        <div className="text-center space-y-4">
+            <button 
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-sm text-zinc-400 hover:text-white transition-colors underline underline-offset-4"
+            >
+                {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
+            </button>
+            <div>
+                <Link href="/" className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+                    Return to Landing Page
+                </Link>
+            </div>
         </div>
       </div>
     </div>

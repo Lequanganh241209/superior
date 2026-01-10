@@ -2,16 +2,39 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { Toaster } from "sonner";
+import { GlobalErrorSuppressor } from "@/components/GlobalErrorSuppressor";
+import { Analytics } from "@vercel/analytics/react";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Aether OS | Autonomous App Architect",
-  description: "The next-generation autonomous application builder.",
+  description: "The next-generation autonomous application builder. Outperform your competition with self-healing infrastructure and neural architecture.",
+  keywords: ["AI", "Autonomous", "Coding", "SaaS", "Builder", "No-code", "Low-code", "Developer Tools"],
+  openGraph: {
+    title: "Aether OS | Autonomous App Architect",
+    description: "The next-generation autonomous application builder.",
+    url: "https://superior.com",
+    siteName: "Aether OS",
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=1200",
+        width: 1200,
+        height: 630,
+        alt: "Aether OS Preview",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Aether OS | Autonomous App Architect",
+    description: "Build software at the speed of thought.",
+    images: ["https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=1200"],
+  },
 };
-
-import { Toaster } from "sonner";
-import { GlobalErrorSuppressor } from "@/components/GlobalErrorSuppressor";
 
 export default function RootLayout({
   children,
@@ -20,20 +43,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={cn(inter.className, "min-h-screen bg-background antialiased selection:bg-primary/20 selection:text-primary")}>
+      <body className={cn(inter.className, "min-h-screen bg-background antialiased selection:bg-cyan-500/30 selection:text-cyan-200")}>
         <GlobalErrorSuppressor />
-        <div className="relative flex min-h-screen flex-col">
-          <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container flex h-14 max-w-screen-2xl items-center">
-              <div className="mr-4 hidden md:flex">
-                <a className="mr-6 flex items-center space-x-2" href="/">
-                  <span className="hidden font-bold sm:inline-block text-primary tracking-tighter">AETHER OS_ V2.2 (Hardened)</span>
-                </a>
-              </div>
-            </div>
-          </header>
-          <main className="flex-1">{children}</main>
-        </div>
+        {children}
+        <Analytics />
         <Toaster position="bottom-right" theme="dark" />
       </body>
     </html>
