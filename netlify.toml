@@ -1,0 +1,16 @@
+# Netlify Configuration File
+# This file tells Netlify how to build and deploy your Next.js application
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[context.production.environment]
+  NODE_VERSION = "20"
+  # Note: You still need to add OPENAI_API_KEY manually in Netlify Dashboard
+
+[context.deploy-preview.environment]
+  NODE_VERSION = "20"
