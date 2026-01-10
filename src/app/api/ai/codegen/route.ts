@@ -243,17 +243,15 @@ const config = {
     }
   ];
 
+  // Declare variables OUTSIDE the try block to avoid ReferenceError
+  let prompt = "Portfolio";
+  let plan = { sql: "", description: "Standard" };
+  let currentFiles: any[] = [];
+  let image: string | null = null;
+
   try {
-    let prompt = "Portfolio";
-    let plan = { sql: "", description: "Standard" };
-    let currentFiles: any[] = [];
-    
     try {
         const body = await req.json();
-        let prompt = "Portfolio";
-        let plan = { sql: "", description: "Standard" };
-        let currentFiles: any[] = [];
-        let image = null;
         
         if (body.prompt && typeof body.prompt === 'string') {
              prompt = body.prompt;
