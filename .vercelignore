@@ -1,7 +1,27 @@
+# Ignore node_modules
 node_modules
-build
+**/node_modules
+node_modules/
+node_modules_hidden
+node_modules_hidden/
+
+# Ignore nextjs build
+.next
+.next/
 dist
+out
+build
+
+# Ignore git
 .git
-.trae
-.log
-.figma
+.git/
+.git_hidden
+
+# Ignore IDE
+.vscode
+.idea
+*.log
+.DS_Store
+
+# Ignore vercel
+.vercel
