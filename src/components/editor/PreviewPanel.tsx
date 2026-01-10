@@ -167,7 +167,7 @@ export function PreviewPanel() {
             files["/App.tsx"] = `
 import React from "react";
 import Page from "${importPath}";
-import "./src/app/globals.css";
+import "./src/app/globals.css"; // IMPORT GLOBALS.CSS TO APPLY THEME VARIABLES
 
 export default function App() {
   return <Page />;

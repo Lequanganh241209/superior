@@ -11,7 +11,9 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      // Return empty list instead of 401 to prevent frontend errors
+      // The frontend will handle redirect if needed based on session check
+      return NextResponse.json({ projects: [] });
     }
 
     // 1. Try to fetch from DB

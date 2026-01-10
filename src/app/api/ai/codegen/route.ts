@@ -261,7 +261,8 @@ const config = {
         
         plan = body.plan || plan;
         currentFiles = body.currentFiles || [];
-        image = body.image || null; // Capture image from body
+        // FIX: Handle image being null or undefined
+        image = body.image && body.image.startsWith("data:") ? body.image : null; 
     } catch (e) {
         return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
@@ -321,6 +322,7 @@ const config = {
 
     **RULE**: Focus your token budget on **Business Logic**, **Layout**, and **Custom Components**.
     **RULE**: NEVER generate a file like \`src/components/ui/button.tsx\`. It already exists.
+    **RULE**: YOU MAY USE \`lucide-react\` ICONS FREELY. Example: \`import { Star, Menu } from "lucide-react";\`
     --------------------------------------------------------------------------------
 
     ### 1. ASSIGNED DESIGN PERSONA: "${selectedPersona.name}"
@@ -496,8 +498,9 @@ const config = {
         }
     }
 
+    const errorMessage = lastError?.message || "Unknown Error";
     return NextResponse.json(
-        { error: "Generation failed after multiple attempts. The AI Architect is currently overloaded. Please try again." }, 
+        { error: `Generation failed: ${errorMessage}. The AI Architect is currently overloaded or encountered an error.` }, 
         { status: 500 }
     );
 
