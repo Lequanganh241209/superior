@@ -28,7 +28,7 @@ async function main() {
         console.log("❌ src/app/page.tsx has no SHA");
         return;
     }
-    const { data: blob } = await octokit.rest.git.getBlob({ owner, repo, file_sha: pageFile.sha });
+    const { data: blob } = await octokit.rest.git.getBlob({ owner, repo, file_sha: pageFile.sha as string });
     const content = Buffer.from(blob.content, "base64").toString("utf-8");
     
     console.log("\n--- CURRENT src/app/page.tsx ---");
