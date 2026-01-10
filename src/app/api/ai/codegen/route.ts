@@ -434,47 +434,62 @@ const config = {
          );
     }
 
-    // 3. CALL OPENAI (With Timeout)
+    // 3. CALL OPENAI (With Retry & Timeout)
     console.log("[CODEGEN] Calling OpenAI...");
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300000); // 300s (5min) Timeout
+    
+    // RETRY LOGIC
+    let attempts = 0;
+    const MAX_RETRIES = 2;
+    let lastError: any = null;
 
-    try {
-        const completion = await openai.chat.completions.create({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage }
-          ],
-          model: "gpt-4o",
-          response_format: { type: "json_object" },
-        }, { signal: controller.signal });
+    while (attempts < MAX_RETRIES) {
+        attempts++;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 180000); // 180s (3min) Timeout per attempt
 
-        clearTimeout(timeoutId);
-        let content = completion.choices[0].message.content;
-        const finishReason = completion.choices[0].finish_reason;
-
-        if (!content) throw new Error("No content from OpenAI");
-        
-        // 4. PARSE & PROCESS
-        let result;
         try {
-            result = JSON.parse(content);
-        } catch (parseError) {
-            console.warn(`[CODEGEN] JSON Parse Failed (Reason: ${finishReason}). Attempting repair...`);
+            console.log(`[CODEGEN] Attempt ${attempts}...`);
+            const completion = await openai.chat.completions.create({
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userMessage + (attempts > 1 ? "\n\nIMPORTANT: The previous attempt failed to generate valid JSON. Please ensure the response is strictly valid JSON with no trailing commas or missing brackets." : "") }
+              ],
+              model: "gpt-4o",
+              response_format: { type: "json_object" },
+              temperature: attempts > 1 ? 0.7 : 0.8, // Lower temp on retry for stability
+            }, { signal: controller.signal });
+
+            clearTimeout(timeoutId);
+            let content = completion.choices[0].message.content;
+            const finishReason = completion.choices[0].finish_reason;
+
+            if (!content) throw new Error("No content from OpenAI");
+            
+            // 4. PARSE & PROCESS
+            let result;
             try {
-                // Try to repair the JSON
-                const repaired = jsonrepair(content);
-                result = JSON.parse(repaired);
-                console.log("[CODEGEN] JSON Repaired Successfully.");
-            } catch (repairError) {
-                console.error("[CODEGEN] JSON Repair Failed:", repairError);
-                // Last resort: regex to extract what we can or return raw error
-                throw new Error(`AI generation failed. Please try again.`);
+                result = JSON.parse(content);
+            } catch (parseError) {
+                console.warn(`[CODEGEN] JSON Parse Failed (Reason: ${finishReason}). Attempting repair...`);
+                try {
+                    // Try to repair the JSON
+                    const repaired = jsonrepair(content);
+                    result = JSON.parse(repaired);
+                    console.log("[CODEGEN] JSON Repaired Successfully.");
+                } catch (repairError) {
+                    console.error("[CODEGEN] JSON Repair Failed:", repairError);
+                    throw new Error("JSON Parse Error");
+                }
             }
-        }
-        
-        // Normalize paths
+            
+            // Normalize paths
+            if (!result.files || !Array.isArray(result.files)) {
+                 // Try to find "files" in a nested object if AI messed up
+                 if (result.project && result.project.files) result.files = result.project.files;
+                 else throw new Error("Missing 'files' array in response");
+            }
+
             result.files = result.files.map((file: any) => {
                 if (!file || !file.path) return file;
 
@@ -498,35 +513,40 @@ const config = {
                 return file;
             });
 
-        // Inject Config Files (Ensure Boilerplate is present)
-        CONFIG_FILES.forEach(configFile => {
-            const existingIndex = result.files.findIndex((f: any) => f.path === configFile.path);
-            if (existingIndex !== -1) {
-                result.files[existingIndex] = configFile;
-            } else {
-                result.files.unshift(configFile);
-            }
-        });
+            // Inject Config Files (Ensure Boilerplate is present)
+            CONFIG_FILES.forEach(configFile => {
+                const existingIndex = result.files.findIndex((f: any) => f.path === configFile.path);
+                if (existingIndex !== -1) {
+                    result.files[existingIndex] = configFile;
+                } else {
+                    result.files.unshift(configFile);
+                }
+            });
 
-        // Inject Mandatory UI Components (If missing)
-        MANDATORY_UI_COMPONENTS.forEach(uiComponent => {
-            const exists = result.files.some((f: any) => f.path === uiComponent.path);
-            if (!exists) {
-                result.files.push(uiComponent);
-            }
-        });
+            // Inject Mandatory UI Components (If missing)
+            MANDATORY_UI_COMPONENTS.forEach(uiComponent => {
+                const exists = result.files.some((f: any) => f.path === uiComponent.path);
+                if (!exists) {
+                    result.files.push(uiComponent);
+                }
+            });
 
-        console.log("[CODEGEN] Success. Files:", result.files.length);
-        return NextResponse.json({ files: result.files });
+            console.log("[CODEGEN] Success. Files:", result.files.length);
+            return NextResponse.json({ files: result.files });
 
-    } catch (innerError: any) {
-        console.error("[CODEGEN] OpenAI/Processing Error:", innerError);
-        // SANITIZED ERROR MESSAGE
-        return NextResponse.json(
-            { error: "Generation failed. The AI Architect is currently overloaded or encountered a syntax error. Please try again." }, 
-            { status: 500 }
-        );
+        } catch (innerError: any) {
+            clearTimeout(timeoutId);
+            console.error(`[CODEGEN] Attempt ${attempts} failed:`, innerError);
+            lastError = innerError;
+            // Continue to next attempt
+        }
     }
+
+    // If all attempts fail
+    return NextResponse.json(
+        { error: "Generation failed after multiple attempts. The AI Architect is currently overloaded. Please try again." }, 
+        { status: 500 }
+    );
 
   } catch (fatalError: any) {
     console.error("[CODEGEN] Fatal Error:", fatalError);
