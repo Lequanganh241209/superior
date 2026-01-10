@@ -105,7 +105,20 @@ export function EditorPanel() {
         const data = await response.json();
         
         if (data.files && Array.isArray(data.files)) {
-            setGeneratedFiles(data.files);
+            const incoming = data.files as any[];
+            const isPartial = Boolean(data.partial);
+            if (isPartial) {
+                const existing = generatedFiles || [];
+                const merged = (() => {
+                    const map = new Map<string, any>();
+                    for (const f of existing) { if (f && f.path) map.set(f.path, f); }
+                    for (const f of incoming) { if (f && f.path) map.set(f.path, f); }
+                    return Array.from(map.values());
+                })();
+                setGeneratedFiles(merged);
+            } else {
+                setGeneratedFiles(incoming);
+            }
             setPreviewUrl("sandpack"); // Enable Preview mode with Sandpack
             setMessages(prev => [...prev, { 
                 role: "assistant", 

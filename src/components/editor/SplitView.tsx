@@ -39,7 +39,20 @@ export function SplitView() {
       const data = await res.json();
 
       if (data.files && Array.isArray(data.files)) {
-          setGeneratedFiles(data.files);
+          const changes = data.files as any[];
+          const isPartial = Boolean(data.partial);
+          if (isPartial) {
+              const existing = generatedFiles || [];
+              const merged = (() => {
+                  const map = new Map<string, any>();
+                  for (const f of existing) { if (f && f.path) map.set(f.path, f); }
+                  for (const f of changes) { if (f && f.path) map.set(f.path, f); }
+                  return Array.from(map.values());
+              })();
+              setGeneratedFiles(merged);
+          } else {
+              setGeneratedFiles(changes);
+          }
           toast.success("Magic Edit applied successfully!", { id: toastId });
           setShowMagicEdit(false);
           setMagicPrompt("");

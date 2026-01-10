@@ -95,8 +95,10 @@ export function PreviewPanel() {
   // Select first file by default if none selected
   React.useEffect(() => {
     if (hasFiles && !selectedFile) {
-        const pageFile = generatedFiles.find((f: any) => f.path.includes("page.tsx")) || generatedFiles[0];
-        setSelectedFile(pageFile.path);
+        const pageFile = generatedFiles.find((f: any) => f?.path?.includes("page.tsx")) || generatedFiles[0];
+        if (pageFile && pageFile.path) {
+            setSelectedFile(pageFile.path);
+        }
     }
     // Auto-switch to preview if previewUrl is set (even if "sandpack"), otherwise default to code
     if (!previewUrl && hasFiles && viewMode === "preview") {
@@ -106,7 +108,12 @@ export function PreviewPanel() {
     }
   }, [hasFiles, selectedFile, generatedFiles, previewUrl, viewMode]);
 
-  const selectedFileContent = generatedFiles?.find((f: any) => f.path === selectedFile)?.content || "";
+  // ERROR BOUNDARY FOR PREVIEW
+  // Sandpack can throw errors that crash the whole React app. We need a way to catch them.
+  // Since we can't easily wrap Sandpack in an ErrorBoundary inside a hook, we rely on Sandpack's own error handling.
+  // But we can ensure we don't pass bad props.
+
+  const selectedFileContent = generatedFiles?.find((f: any) => f?.path === selectedFile)?.content || "";
   const canPreview = !!(previewUrl || hasFiles);
 
   // Prepare files for Sandpack
@@ -148,7 +155,14 @@ export function PreviewPanel() {
 
         if (pageFilePath) {
             // Adjust import path relative to root
-            const importPath = "." + pageFilePath.replace(/\.tsx$/, "");
+            // FIX: If path is /src/app/page.tsx, import should be ./src/app/page
+            // Sandpack file structure is flat at root, so absolute paths work best if mapped correctly.
+            // But we configured tsconfig paths @/* -> ./src/*
+            
+            // Let's use the alias for cleaner imports if possible, or relative path
+            const importPath = pageFilePath.startsWith("/src/") 
+                ? "@" + pageFilePath.substring(4).replace(/\.tsx$/, "") 
+                : "." + pageFilePath.replace(/\.tsx$/, "");
             
             files["/App.tsx"] = `
 import React from "react";
@@ -182,6 +196,42 @@ export default function App() {
         delete files["/postcss.config.js"];
         delete files["/tailwind.config.ts"];
         delete files["/next.config.mjs"];
+        // Also remove vite.config.js if AI generated it, as Sandpack handles its own config
+        delete files["/vite.config.ts"];
+        delete files["/vite.config.js"];
+
+        // NEXT.JS SHIMS (CRITICAL FOR 99% SUCCESS)
+        // Since we are running in Vite (Sandpack), Next.js specific modules like next/link, next/image, next/navigation
+        // will crash the app. We must shim them.
+        
+        files["/node_modules/next/link.js"] = `
+            import React from 'react';
+            export default function Link({ children, href, ...props }) {
+                return React.createElement('a', { href, ...props }, children);
+            }
+        `;
+
+        files["/node_modules/next/image.js"] = `
+            import React from 'react';
+            export default function Image({ src, alt, width, height, ...props }) {
+                return React.createElement('img', { src, alt, width, height, ...props });
+            }
+        `;
+        
+        files["/node_modules/next/navigation.js"] = `
+            export function useRouter() {
+                return { 
+                    push: (url) => window.location.href = url,
+                    replace: (url) => window.location.href = url,
+                    back: () => window.history.back(),
+                    forward: () => window.history.forward(),
+                    refresh: () => window.location.reload(),
+                };
+            }
+            export function usePathname() { return window.location.pathname; }
+            export function useSearchParams() { return new URLSearchParams(window.location.search); }
+            export function useParams() { return {}; }
+        `;
 
         // Vite expects index.tsx as entry usually, or we can configure it.
         files["/index.tsx"] = `
@@ -386,16 +436,22 @@ body {
                                 "@radix-ui/react-separator": "^1.0.3",
                                 "@radix-ui/react-switch": "^1.0.3",
                                 "@radix-ui/react-scroll-area": "^1.0.5",
+                                "@radix-ui/react-accordion": "^1.0.1",
+                                "@radix-ui/react-tabs": "^1.0.4",
+                                "@radix-ui/react-popover": "^1.0.7",
                                 "recharts": "^2.12.0",
                                 "date-fns": "^3.3.1"
-                            }
-                        }}
-                        options={{
-                            activeFile: "/App.tsx",
+                            },
                             externalResources: [
                                 "https://cdn.tailwindcss.com",
                                 "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
                             ]
+                        }}
+                        options={{
+                            activeFile: "/App.tsx",
+                            initMode: "lazy", // Changed from user-visible to lazy to avoid timeout on weak connections
+                            initModeObserverOptions: { rootMargin: '1000px 0px' },
+                            bundlerURL: "https://sandpack-bundler.codesandbox.io", // Explicitly use official bundler
                         }}
                     >
                         <SandpackLayout style={{ height: "100%", width: "100%", borderRadius: 0, border: "none" }}>
@@ -405,6 +461,15 @@ body {
                                 showOpenInCodeSandbox={false} 
                                 showRefreshButton={false}
                                 showRestartButton={false}
+                                actionsChildren={
+                                    <button 
+                                        onClick={handleRefresh}
+                                        className="p-2 text-white/50 hover:text-white transition-colors"
+                                        title="Reload Preview"
+                                    >
+                                        <RefreshCw className="w-4 h-4" />
+                                    </button>
+                                }
                             />
                         </SandpackLayout>
                     </SandpackProvider>

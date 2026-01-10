@@ -22,8 +22,10 @@ const OVERRIDES: Record<string, string> = {
   writingtask2: "https://writingtask2-646deiwnu-le-quang-tons-projects.vercel.app"
 };
 const overrideFor = (p: Project) => {
+  if (!p) return null;
   const key1 = (p.name || "").toLowerCase();
-  const tail = (p.repo_name || "").split("/").pop() || "";
+  const repo = p.repo_name || "";
+  const tail = typeof repo === 'string' ? repo.split("/").pop() || "" : "";
   const key2 = tail.toLowerCase();
   return OVERRIDES[key1] || OVERRIDES[key2] || null;
 };
@@ -90,6 +92,22 @@ export default function Dashboard() {
   useEffect(() => {
     let mounted = true;
 
+    // HYDRATION FIX: Restore files from active project if missing
+    // This runs on mount to ensure if user refreshes, they don't lose the file view
+    const { activeProjectId, projects, generatedFiles, setGeneratedFiles, projectName, setProjectDetails, setPreviewUrl } = useProjectStore.getState();
+    
+    if (activeProjectId && projects.length > 0 && (!generatedFiles || generatedFiles.length === 0)) {
+        const activeProject = projects.find(p => p.id === activeProjectId);
+        if (activeProject && activeProject.files && activeProject.files.length > 0) {
+            console.log("Hydrating files from persisted project:", activeProject.name);
+            setGeneratedFiles(activeProject.files);
+            // Also restore preview URL if available
+            if (activeProject.previewUrl) {
+                setPreviewUrl(activeProject.previewUrl);
+            }
+        }
+    }
+
     const checkUser = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -112,7 +130,10 @@ export default function Dashboard() {
                 const json = await res.json();
                 const list = json.projects || [];
                 // Only auto-select if we have projects AND no project is currently selected
-                if (list.length > 0 && !projectName) {
+                // AND we don't have a locally active project
+                const localActive = useProjectStore.getState().activeProjectId;
+                
+                if (list.length > 0 && !projectName && !localActive) {
                     setProjectDetails(list[0].repo_name, `https://github.com/${list[0].repo_name}`);
                     try {
                         const fixed = await healPreview(list[0]);
