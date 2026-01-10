@@ -250,13 +250,18 @@ const config = {
     
     try {
         const body = await req.json();
-        if (!body.prompt || typeof body.prompt !== 'string' || body.prompt.length < 2) {
-             return NextResponse.json({ error: "Invalid prompt. Please provide a description." }, { status: 400 });
+        let prompt = "Portfolio";
+        let plan = { sql: "", description: "Standard" };
+        let currentFiles: any[] = [];
+        let image = null;
+        
+        if (body.prompt && typeof body.prompt === 'string') {
+             prompt = body.prompt;
         }
         
-        prompt = body.prompt;
         plan = body.plan || plan;
         currentFiles = body.currentFiles || [];
+        image = body.image || null; // Capture image from body
     } catch (e) {
         return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
@@ -392,17 +397,31 @@ const config = {
 
         try {
             console.log(`[CODEGEN] Attempt ${attempts}...`);
+            
+            // CONSTRUCT MESSAGES FOR GPT-4o VISION
+            const userContent: any[] = [{ type: "text", text: `Prompt: ${prompt}\n\nPlan: ${plan.description}\n\nREMEMBER: You are the "${selectedPersona.name}" Persona. DESIGN ACCORDINGLY.` }];
+            
+            if (image) {
+                userContent.push({
+                    type: "image_url",
+                    image_url: {
+                        url: image, // Base64 or URL
+                    }
+                });
+                console.log("[CODEGEN] Image attached to prompt");
+            }
+
             const completion = await openai.chat.completions.create({
               messages: [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: `Prompt: ${prompt}\n\nPlan: ${plan.description}\n\nREMEMBER: You are the "${selectedPersona.name}" Persona. DESIGN ACCORDINGLY.` },
+                { role: "user", content: userContent as any },
                 // RANDOM SEED to force variety in code structure
                 { role: "system", content: `SEED: ${Date.now()}-${Math.random()}-FORCE_VARIATION` }
               ],
               model: "gpt-4o",
               response_format: { type: "json_object" },
-              temperature: 0.95, // High temp for maximum creativity
-              top_p: 0.98,
+              "temperature": 1.0, // MAXIMUM CREATIVITY
+              "top_p": 1.0,
             }, { signal: controller.signal });
 
             clearTimeout(timeoutId);

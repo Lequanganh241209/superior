@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Sparkles, User, Loader2, Code2, Plus, FolderOpen, Trash2, History } from "lucide-react";
+import { Send, Sparkles, User, Loader2, Code2, Plus, FolderOpen, Trash2, History, ImagePlus, X } from "lucide-react";
 import { useProjectStore } from "@/store/project-store";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -11,11 +11,13 @@ import { cn } from "@/lib/utils";
 interface Message {
     role: "user" | "assistant";
     content: string;
+    image?: string;
 }
 
 export function EditorPanel() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: "Hello! I am your Aether Architect. Describe the website you want to build, and I will generate the code for you." }
   ]);
@@ -71,18 +73,48 @@ export function EditorPanel() {
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (const item of items) {
+        if (item.type.indexOf("image") !== -1) {
+            const blob = item.getAsFile();
+            if (blob) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    setAttachedImage(event.target?.result as string);
+                    toast.success("Image attached from clipboard");
+                };
+                reader.readAsDataURL(blob);
+            }
+        }
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setAttachedImage(event.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim() || loading) return;
+    if ((!prompt.trim() && !attachedImage) || loading) return;
 
     const userMsg = prompt;
-    setMessages(prev => [...prev, { role: "user", content: userMsg }]);
+    const userImage = attachedImage;
+    setMessages(prev => [...prev, { role: "user", content: userMsg, image: userImage || undefined }]);
     setPrompt("");
+    setAttachedImage(null);
     setLoading(true);
 
     // Create project if none exists
     if (!activeProjectId) {
-        const name = userMsg.length > 30 ? userMsg.slice(0, 30) + "..." : userMsg;
+        const name = userMsg.length > 30 ? userMsg.slice(0, 30) + "..." : "New Project";
         createProject(name, userMsg);
     }
 
@@ -107,7 +139,8 @@ export function EditorPanel() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
                 prompt: userMsg,
-                plan: "full_website", // Simple plan for now
+                image: userImage, // SEND IMAGE TO API
+                plan: "full_website", 
                 currentFiles: generatedFiles
             }),
         });
@@ -213,10 +246,13 @@ export function EditorPanel() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((msg, idx) => (
                 <div key={idx} className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${msg.role === "assistant" ? "bg-primary/10" : "bg-muted"}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === "assistant" ? "bg-primary/10" : "bg-muted"}`}>
                         {msg.role === "assistant" ? <Sparkles className="w-4 h-4 text-primary" /> : <User className="w-4 h-4" />}
                     </div>
                     <div className={`flex-1 p-4 rounded-lg max-w-[80%] ${msg.role === "assistant" ? "bg-muted/50 rounded-tl-none" : "bg-primary text-primary-foreground rounded-tr-none"}`}>
+                        {msg.image && (
+                            <img src={msg.image} alt="User upload" className="max-w-full h-auto rounded-md mb-2 border border-white/20" />
+                        )}
                         <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     </div>
                 </div>
@@ -235,21 +271,39 @@ export function EditorPanel() {
         </div>
 
         <div className="p-4 border-t bg-background">
+            {attachedImage && (
+                <div className="relative inline-block mb-2 group">
+                    <img src={attachedImage} alt="Attached" className="h-16 w-16 object-cover rounded-md border" />
+                    <button 
+                        onClick={() => setAttachedImage(null)}
+                        className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                        <X className="w-3 h-3" />
+                    </button>
+                </div>
+            )}
             <form onSubmit={handleSubmit} className="relative">
                 <Textarea 
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Describe your dream website..."
-                    className="min-h-[100px] pr-12 resize-none shadow-none focus-visible:ring-1"
+                    onPaste={handlePaste}
+                    placeholder="Describe your dream website... (Paste images here)"
+                    className="min-h-[100px] pr-20 resize-none shadow-none focus-visible:ring-1"
                 />
-                <Button 
-                    size="icon" 
-                    type="submit" 
-                    className="absolute bottom-3 right-3 h-8 w-8"
-                    disabled={!prompt.trim()}
-                >
-                    <Send className="w-4 h-4" />
-                </Button>
+                <div className="absolute bottom-3 right-3 flex gap-2">
+                     <label className="cursor-pointer p-2 hover:bg-muted rounded-md transition-colors">
+                        <ImagePlus className="w-4 h-4 text-muted-foreground" />
+                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                    </label>
+                    <Button 
+                        size="icon" 
+                        type="submit" 
+                        className="h-8 w-8"
+                        disabled={(!prompt.trim() && !attachedImage)}
+                    >
+                        <Send className="w-4 h-4" />
+                    </Button>
+                </div>
             </form>
             <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
                 {["Landing Page", "Portfolio", "SaaS Dashboard", "E-commerce"].map((suggestion) => (
