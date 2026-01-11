@@ -348,9 +348,7 @@ const config = {
         components: "Rounded-xl, thin borders (border-black/5), heavy use of white space."
     };
 
-    console.log(\`[CODEGEN] Selected Persona: \${selectedPersona.name}\`);
-
-    const systemPrompt = \`
+    const systemPrompt = `
     You are a Senior Frontend Architect and UI/UX Lead at a top-tier agency (like Pentagram or Metalab).
     Your goal is to build a **PRODUCTION-READY, HIGH-CONVERSION** website that looks significantly better than Lovable, V0, or generic templates.
 
