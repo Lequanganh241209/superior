@@ -21,7 +21,7 @@ function Hero() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              <span>SYSTEM_READY_V3.0_LINT_FREE</span>
+              <span>SYSTEM_READY_V3.1_NEXT14_STABLE</span>
             </div>
 
             <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white leading-[1.1]">
