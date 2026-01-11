@@ -437,7 +437,7 @@ const config = {
     --------------------------------------------------------------------------------
     **RETURN FORMAT**: JSON object with a "files" array containing { path, content }.
     **CRITICAL**: GENERATE FULL, WORKING CODE. NO PLACEHOLDERS. NO "TODO".
-    \`;
+    `;
 
     // 3. CALL OPENAI (With Retry & Timeout)
     console.log("[CODEGEN] Calling OpenAI...");
