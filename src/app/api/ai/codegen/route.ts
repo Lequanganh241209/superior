@@ -364,6 +364,11 @@ const config = {
     ### 3. MANDATORY COMPONENT STRUCTURE (THE "FULL STACK")
     You must generate a complete landing page ecosystem. Do NOT just dump everything in page.tsx.
     
+    **CRITICAL: ROBUSTNESS & ERROR HANDLING**
+    - Wrap the main content in a \`<Suspense fallback={<div className="animate-pulse bg-zinc-900 h-96 w-full rounded-lg" />}>\` boundary.
+    - Ensure all images have \`alt\` tags for SEO/Accessibility.
+    - Use \`lucide-react\` icons for empty states or error states.
+    
     **Required Files:**
     1. \`src/app/page.tsx\` -> Composes the sections below.
     2. \`src/components/layout/navbar.tsx\` -> Sticky, glassmorphic (.glass), with mobile menu.
