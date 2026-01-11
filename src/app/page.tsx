@@ -16,12 +16,12 @@ function Hero() {
       <div className="container relative z-10 px-4 md:px-6 pt-20">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-8">
-            <div className="inline-flex items-center space-x-2 border border-cyan-900/30 bg-cyan-950/10 px-3 py-1 text-xs font-mono text-cyan-400 backdrop-blur-md">
+            <div className="inline-flex items-center space-x-2 border border-green-900/30 bg-green-950/10 px-3 py-1 text-xs font-mono text-green-400 backdrop-blur-md">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              <span>SYSTEM_READY_V2.3_DEPLOYED</span>
+              <span>SYSTEM_READY_V2.5_VERCEL_LIVE</span>
             </div>
 
             <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white leading-[1.1]">
