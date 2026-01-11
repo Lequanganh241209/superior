@@ -561,7 +561,7 @@ const config = {
         { status: 500 }
     );
 
-  } catch (fatalError: any) {
+    } catch (fatalError: any) {
     console.error("[CODEGEN] Fatal Error:", fatalError);
     return NextResponse.json(
         { error: "Internal Server Error" }, 
