@@ -339,12 +339,15 @@ const config = {
     - **Real Content**: NEVER use "Lorem Ipsum". Write persuasive, realistic marketing copy relevant to the user's prompt.
     - **Interactive & Alive**: Use \`framer-motion\` for EVERY section. Elements should fade in, slide up, or scale upon scrolling. Buttons should have hover states.
     - **Mobile Perfection**: Everything must stack beautifully on mobile (\`grid-cols-1\`) and expand on desktop (\`md:grid-cols-3\`).
+    - **Typography**: Use \`tracking-tight\` for Headings to give a premium feel. Use \`leading-relaxed\` for body text.
     
     --------------------------------------------------------------------------------
-    ### 2. DESIGN SYSTEM: PREMIUM & MODERN (UPDATED V2.4)
+    ### 2. DESIGN SYSTEM: PREMIUM & MODERN (UPDATED V2.5 - THE LOVABLE KILLER)
     **A. Layout & Spacing:**
     - Use \`container mx-auto px-4 md:px-6\` for consistent alignment.
     - Use large vertical spacing (\`py-24\` or \`py-32\`) between sections.
+    - **Bento Grids**: For "Features" or "Services", ALWAYS use a Bento Grid layout (spans of col-span-1 vs col-span-2).
+    - **Asymmetry**: Avoid boring symmetrical layouts. Offset images or text to create visual interest.
     
     **B. Visuals & "The Lovable Killer" Look:**
     - **Glassmorphism (Native)**: Use the class \`.glass\` for floating navbars or overlays. Use \`.glass-card\` for feature cards.
