@@ -348,6 +348,8 @@ const config = {
         components: "Rounded-xl, thin borders (border-black/5), heavy use of white space."
     };
 
+    console.log(`[CODEGEN] Selected Persona: ${selectedPersona.name}`);
+
     const systemPrompt = `
     You are a Senior Frontend Architect and UI/UX Lead at a top-tier agency (like Pentagram or Metalab).
     Your goal is to build a **PRODUCTION-READY, HIGH-CONVERSION** website that looks significantly better than Lovable, V0, or generic templates.
@@ -454,10 +456,10 @@ const config = {
         const timeoutId = setTimeout(() => controller.abort(), 180000); // 180s (3min) Timeout per attempt
 
         try {
-            console.log(\`[CODEGEN] Attempt \${attempts}...\`);
+            console.log(`[CODEGEN] Attempt ${attempts}...`);
             
             // CONSTRUCT MESSAGES FOR GPT-4o VISION
-            const userContent: any[] = [{ type: "text", text: \`Prompt: \${prompt}\n\nPlan: \${plan.description}\n\nREMEMBER: You are the "\${selectedPersona.name}" Persona. DESIGN ACCORDINGLY.\` }];
+            const userContent: any[] = [{ type: "text", text: `Prompt: ${prompt}\n\nPlan: ${plan.description}\n\nREMEMBER: You are the "${selectedPersona.name}" Persona. DESIGN ACCORDINGLY.` }];
             
             if (image) {
                 userContent.push({
@@ -474,7 +476,7 @@ const config = {
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userContent as any },
                 // RANDOM SEED to force variety in code structure
-                { role: "system", content: \`SEED: \${Date.now()}-\${Math.random()}-FORCE_VARIATION\` }
+                { role: "system", content: `SEED: ${Date.now()}-${Math.random()}-FORCE_VARIATION` }
               ],
               model: "gpt-4o",
               response_format: { type: "json_object" },
@@ -493,7 +495,7 @@ const config = {
             try {
                 result = JSON.parse(content);
             } catch (parseError) {
-                console.warn(\`[CODEGEN] JSON Parse Failed (Reason: \${finishReason}). Attempting repair...\`);
+                console.warn(`[CODEGEN] JSON Parse Failed (Reason: ${finishReason}). Attempting repair...`);
                 try {
                     const repaired = jsonrepair(content);
                     result = JSON.parse(repaired);
@@ -550,14 +552,14 @@ const config = {
 
         } catch (innerError: any) {
             clearTimeout(timeoutId);
-            console.error(\`[CODEGEN] Attempt \${attempts} failed:\`, innerError);
+            console.error(`[CODEGEN] Attempt ${attempts} failed:`, innerError);
             lastError = innerError;
         }
     }
 
     const errorMessage = lastError?.message || "Unknown Error";
     return NextResponse.json(
-        { error: \`Generation failed: \${errorMessage}. The AI Architect is currently overloaded or encountered an error.\` }, 
+        { error: `Generation failed: ${errorMessage}. The AI Architect is currently overloaded or encountered an error.` }, 
         { status: 500 }
     );
 
