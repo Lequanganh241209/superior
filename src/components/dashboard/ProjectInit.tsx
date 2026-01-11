@@ -242,6 +242,14 @@ Card.displayName = "Card"
         addLog("PHASE 2: GENERATING FULL-STACK SOURCE CODE...");
         toast.loading("Phase 2: Generating Full-Stack Source Code...", { id: toastId });
         
+        // ARTIFICIAL DELAY FOR UX "THOUGHT PROCESS" VISIBILITY
+        await new Promise(r => setTimeout(r, 800));
+        addLog(">> Analyzing UX Patterns & Design System...");
+        await new Promise(r => setTimeout(r, 800));
+        addLog(">> Selecting Optimal Component Architecture...");
+        await new Promise(r => setTimeout(r, 800));
+        addLog(">> Injecting Framer Motion Animations...");
+        
         const codeRes = await fetch('/api/ai/codegen', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
