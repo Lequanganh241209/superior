@@ -4,36 +4,36 @@
 
 @layer base {
   :root {
-    --background: 0 0% 2%; /* Deep Black #050505 */
+    --background: 240 10% 3.9%; /* Richer Black */
     --foreground: 0 0% 98%;
     
-    --card: 0 0% 4%;
+    --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
     
-    --popover: 0 0% 4%;
+    --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
     
-    /* Electric Cyan Primary */
-    --primary: 186 100% 50%; /* #06b6d4 */
-    --primary-foreground: 0 0% 0%;
+    /* Electric Cyan Primary - Refined */
+    --primary: 186 100% 50%;
+    --primary-foreground: 240 5.9% 10%;
     
-    --secondary: 240 4% 16%;
+    --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     
-    --muted: 240 4% 16%;
+    --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
     
-    --accent: 186 100% 50%;
+    --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
     
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
     --ring: 186 100% 50%;
     
-    --radius: 0px; /* SHARP CORNERS for Brutalist/Tech look */
+    --radius: 0.5rem;
   }
 }
 
@@ -43,5 +43,39 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 5px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-black/40 backdrop-blur-xl border border-white/10 shadow-xl;
+  }
+  
+  .glass-card {
+    @apply bg-gradient-to-b from-white/5 to-white/0 backdrop-blur-md border border-white/10 shadow-2xl;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 20px hsla(var(--primary), 0.5);
+  }
+  
+  .bg-grid-white {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(255 255 255 / 0.05)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e");
   }
 }
