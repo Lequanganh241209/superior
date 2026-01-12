@@ -52,7 +52,11 @@ export function ProjectInit() {
     if (!input.trim() || !projectName.trim()) return;
     
     // Create Project in Store immediately for persistence
-    createProject(projectName, input);
+    try {
+        createProject(projectName, input);
+    } catch (e) {
+        console.error("Failed to create project in store:", e);
+    }
 
     const slug = projectName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-_]/g, "");
     const parse = async (res: Response) => {
@@ -398,11 +402,15 @@ export default function Page() {
         
         let ensuredFiles: { path: string; content: string }[] = [];
         try {
-            if (!codeData.files || !Array.isArray(codeData.files)) {
-                throw new Error("Invalid file structure received from AI Architect.");
-            }
-            
-            ensuredFiles = ensureRequiredFiles(codeData.files).map((file) => {
+            if (!codeData || !codeData.files || !Array.isArray(codeData.files)) {
+                // If codeData is null or invalid, fallback to empty array but don't crash
+                console.error("Invalid codeData structure:", codeData);
+                ensuredFiles = [];
+                // Maybe throw to stop deployment? Or continue with empty?
+                // For robustness, let's try to continue if we have a plan, otherwise stop.
+                if (!plan) throw new Error("Critical Failure: AI Architect produced no code.");
+            } else {
+                ensuredFiles = ensureRequiredFiles(codeData.files).map((file) => {
                 const normalizedPath = (file.path || "").replace(/\\/g, "/");
                 const isCodeFile = normalizedPath.endsWith(".ts") || normalizedPath.endsWith(".tsx");
                 if (!isCodeFile) return file;
@@ -529,6 +537,7 @@ export default function Page() {
                 
                 return { ...file, content };
             });
+            } // End else
         } catch (e: any) {
             console.error("Auditing failed:", e);
             addWizardLog(`WARNING: Auditing skipped due to error: ${e.message}`);
