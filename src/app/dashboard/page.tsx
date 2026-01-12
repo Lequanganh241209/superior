@@ -3,12 +3,22 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { SplitView } from "@/components/editor/SplitView";
 import { useProjectStore } from "@/store/project-store";
 import { Plus, Terminal, Sparkles, FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/dashboard/SkeletonLoader";
-import { ProjectInit } from "@/components/dashboard/ProjectInit";
+import dynamic from "next/dynamic";
+
+// Dynamic Imports to prevent Circular Dependency / ReferenceError ('C' initialization)
+const ProjectInit = dynamic(
+  () => import("@/components/dashboard/ProjectInit").then((mod) => mod.ProjectInit),
+  { ssr: false, loading: () => <DashboardSkeleton /> }
+);
+
+const SplitView = dynamic(
+  () => import("@/components/editor/SplitView").then((mod) => mod.SplitView),
+  { ssr: false, loading: () => <DashboardSkeleton /> }
+);
 
 interface Project {
   id: string;
