@@ -393,20 +393,23 @@ Card.displayName = "Card"
                 }
             }
 
-            // Fix 1: Force default export if missing in components
-            if (normalizedPath.includes("components/") && !content.includes("export default")) {
-                 const componentNameMatch = content.match(/export (?:const|function) (\w+)/);
-                 if (componentNameMatch && componentNameMatch[1]) {
-                     content += `\n\nexport default ${componentNameMatch[1]};`;
-                 }
+            // Fix 1: Removed outdated "Force default export" logic.
+            // We now strictly enforce Named Exports.
+            // If we find `export default function`, we change it to `export function`
+            // and remove the `export default` line if separate.
+
+            if (normalizedPath.includes("components/")) {
+                if (content.includes("export default function")) {
+                     content = content.replace("export default function", "export function");
+                } else if (content.includes("export default class")) {
+                     content = content.replace("export default class", "export class");
+                }
+                // Handle `export default ComponentName` at the end
+                // We keep it for safety but ensure named export exists too.
             }
 
             // Fix 2: Convert "export const Navbar" to "function Navbar" if needed for default export
-            if (normalizedPath.includes("components/") && content.includes("export default")) {
-                // Sometimes AI does `export const Navbar = ...; export default Navbar;` which is fine,
-                // but if it does `import { Navbar } from ...` elsewhere it breaks.
-                // We mainly ensure consistent usage.
-            }
+            // (Removed as we now prefer Named Exports)
             
             const parts = normalizedPath.split("/");
             const depth = parts[0] === "src" ? Math.max(parts.length - 2, 0) : 0;

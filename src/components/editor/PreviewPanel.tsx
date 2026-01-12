@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useProjectStore } from "@/store/project-store";
-import { RefreshCw, ExternalLink, FileCode, Code2, Download, Rocket, Share2 } from "lucide-react";
+import { RefreshCw, ExternalLink, FileCode, Code2, Download, Rocket, Share2, Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -12,11 +12,12 @@ import { saveAs } from "file-saver";
 import { toast } from "sonner";
 
 export function PreviewPanel() {
-  const { previewUrl, generatedFiles, projectName } = useProjectStore();
+  const { previewUrl, generatedFiles, projectName, setGeneratedFiles } = useProjectStore();
   const [key, setKey] = useState(0);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"preview" | "code">("code");
   const [isDeploying, setIsDeploying] = useState(false);
+  const [isFixing, setIsFixing] = useState(false);
 
   const handleRefresh = () => {
     setKey(prev => prev + 1);
@@ -80,15 +81,70 @@ export function PreviewPanel() {
   };
 
   const handleExternalLink = () => {
-     // If using Sandpack, we can't easily "open external" without CodeSandbox.
-     // But we can trigger the native Sandpack "Open in CodeSandbox" if we enable it, 
-     // or just show a toast explaining.
      if (previewUrl && previewUrl !== "sandpack") {
          window.open(previewUrl, "_blank");
      } else {
         toast.info("Click the 'Open in CodeSandbox' icon inside the preview to edit externally.");
      }
   };
+
+  // --- SELF-CORRECTION LOOP: AUTO-FIX HANDLER ---
+  const handleAutoFix = async (errorMessage: string) => {
+    if (isFixing) return;
+    setIsFixing(true);
+    toast.loading("Superior Self-Healing: Fixing Runtime Error...", { id: "fix-loader" });
+
+    try {
+        // Find the most likely culprit file (usually page.tsx or the one causing error if we knew)
+        // For now, we send the main page and components.
+        const pageFile = generatedFiles.find((f: any) => f.path.includes("page.tsx"));
+        
+        const res = await fetch("/api/ai/fix", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                errorMessage,
+                file: pageFile?.path || "src/app/page.tsx",
+                code: pageFile?.content || "",
+                allFiles: generatedFiles
+            })
+        });
+
+        const data = await res.json();
+        
+        if (data.fixedCode && pageFile) {
+            // Update the file in the store
+            const newFiles = generatedFiles.map((f: any) => 
+                f.path === pageFile.path ? { ...f, content: data.fixedCode } : f
+            );
+            setGeneratedFiles(newFiles);
+            toast.success("Code Auto-Corrected Successfully!", { id: "fix-loader" });
+            handleRefresh(); // Reload preview
+        } else {
+            toast.error("Could not auto-fix this error.", { id: "fix-loader" });
+        }
+
+    } catch (e) {
+        console.error("Auto-fix failed:", e);
+        toast.error("Self-Healing System failed.", { id: "fix-loader" });
+    } finally {
+        setIsFixing(false);
+    }
+  };
+
+  // --- LISTENER FOR SANDBOX ERRORS ---
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === "SANDBOX_RUNTIME_ERROR") {
+            console.log("Superior Error Detector Caught:", event.data.message);
+            // Trigger Auto-Fix
+            handleAutoFix(event.data.message);
+        }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [generatedFiles, isFixing]); // Re-bind if files change to ensure freshness
 
   const hasFiles = generatedFiles && Array.isArray(generatedFiles) && generatedFiles.length > 0;
   
@@ -108,11 +164,6 @@ export function PreviewPanel() {
     }
   }, [hasFiles, selectedFile, generatedFiles, previewUrl, viewMode]);
 
-  // ERROR BOUNDARY FOR PREVIEW
-  // Sandpack can throw errors that crash the whole React app. We need a way to catch them.
-  // Since we can't easily wrap Sandpack in an ErrorBoundary inside a hook, we rely on Sandpack's own error handling.
-  // But we can ensure we don't pass bad props.
-
   const selectedFileContent = generatedFiles?.find((f: any) => f?.path === selectedFile)?.content || "";
   const canPreview = !!(previewUrl || hasFiles);
 
@@ -126,8 +177,6 @@ export function PreviewPanel() {
         // Add all generated files
         generatedFiles.forEach((file: any) => {
             if (!file || !file.path) return;
-            
-            // SKIP package.json from the preview environment.
             if (file.path.endsWith("package.json")) return;
 
             // Ensure path starts with /
@@ -139,9 +188,7 @@ export function PreviewPanel() {
         files["/tsconfig.json"] = JSON.stringify({
         compilerOptions: {
             baseUrl: ".",
-            paths: {
-            "@/*": ["./src/*"]
-            },
+            paths: { "@/*": ["./src/*"] },
             jsx: "react-jsx",
             target: "esnext",
             module: "esnext",
@@ -149,17 +196,59 @@ export function PreviewPanel() {
         }
         }, null, 2);
 
-        // Create entry point App.tsx that renders src/app/page.tsx
-        // Find the main page file (look for src/app/page.tsx, or any page.tsx)
+        // --- INJECT ERROR BOUNDARY COMPONENT ---
+        files["/src/components/ErrorBoundary.tsx"] = `
+import React, { Component, ErrorInfo, ReactNode } from "react";
+
+interface Props { children: ReactNode }
+interface State { hasError: boolean; error: Error | null }
+
+export class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Send error to parent (Superior Platform)
+    window.parent.postMessage({
+      type: "SANDBOX_RUNTIME_ERROR",
+      message: error.message,
+      stack: error.stack
+    }, "*");
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-950 text-red-400 p-6 text-center">
+          <div className="bg-red-950/30 border border-red-500/30 p-6 rounded-xl max-w-md w-full">
+             <h2 className="text-xl font-bold mb-2 text-red-500">Runtime Error Detected</h2>
+             <p className="text-sm text-neutral-400 mb-4">Superior Self-Healing Protocol Activated</p>
+             <div className="bg-black/50 p-3 rounded text-xs font-mono text-left overflow-auto max-h-40 mb-4">
+               {this.state.error?.message}
+             </div>
+             <div className="flex items-center justify-center gap-2 text-sm text-green-400 animate-pulse">
+               <span className="w-2 h-2 rounded-full bg-green-500"/>
+               AI is analyzing and fixing...
+             </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+`;
+
+        // Create entry point App.tsx
         const pageFilePath = Object.keys(files).find(path => path.endsWith("/page.tsx") || path.endsWith("/index.tsx"));
 
         if (pageFilePath) {
-            // Adjust import path relative to root
-            // FIX: If path is /src/app/page.tsx, import should be ./src/app/page
-            // Sandpack file structure is flat at root, so absolute paths work best if mapped correctly.
-            // But we configured tsconfig paths @/* -> ./src/*
-            
-            // Let's use the alias for cleaner imports if possible, or relative path
             const importPath = pageFilePath.startsWith("/src/") 
                 ? "@" + pageFilePath.substring(4).replace(/\.tsx$/, "") 
                 : "." + pageFilePath.replace(/\.tsx$/, "");
@@ -170,8 +259,6 @@ import Page from "${importPath}";
 import "./src/app/globals.css"; 
 
 export default function App() {
-  // SIMULATE ROOT LAYOUT WRAPPER
-  // We apply the classes that are usually in src/app/layout.tsx
   return (
     <div className="min-h-screen bg-background font-body antialiased text-foreground selection:bg-indigo-100">
        <Page />
@@ -180,55 +267,34 @@ export default function App() {
 }
 `;
         } else {
-            // Fallback if no page.tsx
-            files["/App.tsx"] = `export default function App() { return <div style={{padding: 20, color: 'white'}}>No page.tsx found in generated files. Check the Code tab to see what was generated.</div> }`;
+            files["/App.tsx"] = `export default function App() { return <div>No page.tsx found.</div> }`;
         }
         
-        // --- NEXT.JS SHIM INJECTION (CRITICAL FIX) ---
-        // Iterate through ALL files and replace Next.js imports with shims
+        // --- NEXT.JS SHIMS ---
         Object.keys(files).forEach(path => {
             let content = files[path];
-            
-            // 1. Shim next/link -> Replace with simple <a> tag wrapper
             if (content.includes('from "next/link"') || content.includes("from 'next/link'")) {
-                 content = content.replace(
-                    /import\s+Link\s+from\s+['"]next\/link['"];?/g, 
-                    `const Link = ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a>;`
-                 );
+                 content = content.replace(/import\s+Link\s+from\s+['"]next\/link['"];?/g, `const Link = ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a>;`);
             }
-            
-            // 2. Shim next/image -> Replace with simple <img> tag wrapper
             if (content.includes('from "next/image"') || content.includes("from 'next/image'")) {
-                 content = content.replace(
-                    /import\s+Image\s+from\s+['"]next\/image['"];?/g, 
-                    `const Image = ({ src, alt, ...props }: any) => <img src={src} alt={alt} {...props} />;`
-                 );
+                 content = content.replace(/import\s+Image\s+from\s+['"]next\/image['"];?/g, `const Image = ({ src, alt, ...props }: any) => <img src={src} alt={alt} {...props} />;`);
             }
-            
-            // 3. Shim next/navigation (useRouter) -> Mock implementation
             if (content.includes('from "next/navigation"') || content.includes("from 'next/navigation'")) {
-                 content = content.replace(
-                    /import\s+\{\s*useRouter\s*\}\s+from\s+['"]next\/navigation['"];?/g,
-                    `const useRouter = () => ({ push: () => {}, replace: () => {}, back: () => {} });`
-                 );
+                 content = content.replace(/import\s+\{\s*useRouter\s*\}\s+from\s+['"]next\/navigation['"];?/g, `const useRouter = () => ({ push: () => {}, replace: () => {}, back: () => {} });`);
             }
-
             files[path] = content;
         });
         
-        // VITE TEMPLATE FIX: Point index.html to App.tsx
-        // WE MUST INJECT TAILWIND SCRIPT DIRECTLY INTO HTML TO ENSURE IT LOADS
+        // VITE TEMPLATE FIX
         const indexHtmlContent = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preview</title>
-    <!-- PRE-LOAD FONTS FOR LOVABLE DESIGN -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -236,10 +302,7 @@ export default function App() {
         theme: {
           container: { center: true, padding: "2rem", screens: { "2xl": "1400px" } },
           extend: {
-            fontFamily: {
-              heading: ['Outfit', 'sans-serif'],
-              body: ['Inter', 'sans-serif'],
-            },
+            fontFamily: { heading: ['Outfit', 'sans-serif'], body: ['Inter', 'sans-serif'] },
             colors: {
               border: "hsl(var(--border))", input: "hsl(var(--input))", ring: "hsl(var(--ring))", background: "hsl(var(--background))", foreground: "hsl(var(--foreground))",
               primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
@@ -251,20 +314,8 @@ export default function App() {
               card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
             },
             borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
-            keyframes: {
-                "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
-                "accordion-up": { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } },
-                "fade-in": { "0%": { opacity: "0", transform: "translateY(10px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
-                "fade-out": { "0%": { opacity: "1", transform: "translateY(0)" }, "100%": { opacity: "0", transform: "translateY(10px)" } },
-                "scale-in": { "0%": { transform: "scale(0.95)", opacity: "0" }, "100%": { transform: "scale(1)", opacity: "1" } },
-            },
-            animation: {
-                "accordion-down": "accordion-down 0.2s ease-out",
-                "accordion-up": "accordion-up 0.2s ease-out",
-                "fade-in": "fade-in 0.5s ease-out forwards",
-                "fade-out": "fade-out 0.5s ease-out forwards",
-                "scale-in": "scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-            },
+            keyframes: { "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } }, "accordion-up": { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } } },
+            animation: { "accordion-down": "accordion-down 0.2s ease-out", "accordion-up": "accordion-up 0.2s ease-out" },
           }
         }
       }
@@ -277,152 +328,59 @@ export default function App() {
 </html>`;
         
         files["/index.html"] = indexHtmlContent;
-        files["/public/index.html"] = indexHtmlContent; // DUPLICATE FOR SAFETY
+        files["/public/index.html"] = indexHtmlContent;
 
-        // REMOVE CONFIG FILES to prevent build errors in Sandpack
         delete files["/postcss.config.js"];
         delete files["/tailwind.config.ts"];
         delete files["/next.config.mjs"];
         
-        // INJECT VITE CONFIG TO HANDLE ALIASES (@/ -> /src/)
         files["/vite.config.ts"] = `
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    alias: {
-      '@': '/src',
-    },
-  },
+  resolve: { alias: { '@': '/src' } },
 })
 `;
 
-        // NEXT.JS SHIMS (CRITICAL FOR 99% SUCCESS)
-        // Since we are running in Vite (Sandpack), Next.js specific modules like next/link, next/image, next/navigation
-        // will crash the app. We must shim them.
-        
-        files["/node_modules/next/link.js"] = `
-            import React from 'react';
-            export default function Link({ children, href, ...props }) {
-                return React.createElement('a', { href, ...props }, children);
-            }
-        `;
+        files["/node_modules/next/link.js"] = `import React from 'react'; export default function Link({ children, href, ...props }) { return React.createElement('a', { href, ...props }, children); }`;
+        files["/node_modules/next/image.js"] = `import React from 'react'; export default function Image({ src, alt, width, height, ...props }) { return React.createElement('img', { src, alt, width, height, ...props }); }`;
+        files["/node_modules/next/navigation.js"] = `export function useRouter() { return { push: () => {}, replace: () => {}, back: () => {}, refresh: () => {} }; } export function usePathname() { return window.location.pathname; } export function useSearchParams() { return new URLSearchParams(window.location.search); } export function useParams() { return {}; }`;
 
-        files["/node_modules/next/image.js"] = `
-            import React from 'react';
-            export default function Image({ src, alt, width, height, ...props }) {
-                return React.createElement('img', { src, alt, width, height, ...props });
-            }
-        `;
-        
-        files["/node_modules/next/navigation.js"] = `
-            export function useRouter() {
-                return { 
-                    push: (url) => window.location.href = url,
-                    replace: (url) => window.location.href = url,
-                    back: () => window.history.back(),
-                    forward: () => window.history.forward(),
-                    refresh: () => window.location.reload(),
-                };
-            }
-            export function usePathname() { return window.location.pathname; }
-            export function useSearchParams() { return new URLSearchParams(window.location.search); }
-            export function useParams() { return {}; }
-        `;
-
-        // Vite expects index.tsx as entry usually, or we can configure it.
+        // --- UPDATE INDEX.TSX TO USE ERROR BOUNDARY ---
         files["/index.tsx"] = `
 import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./src/app/globals.css";
 import App from "./App";
+import { ErrorBoundary } from "./src/components/ErrorBoundary";
 
 const root = createRoot(document.getElementById("root"));
 root.render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>
 );
 `;
 
-        // Add basic global css if missing
         if (!files["/src/app/globals.css"]) {
-            files["/src/app/globals.css"] = `
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  width: 100%;
-}
-
-body {
-  font-family: sans-serif;
-  background-color: #ffffff;
-  color: #000000;
-}
-`;
+            files["/src/app/globals.css"] = `@tailwind base; @tailwind components; @tailwind utilities; body { background: #fff; color: #000; }`;
         }
-
-        // SANITIZE GLOBALS.CSS for Preview
+        
+        // Sanitize CSS
         if (files["/src/app/globals.css"]) {
             const content = files["/src/app/globals.css"];
-            
-            // Extract :root block safely
-            let rootBlock = "";
-            try {
-                const rootMatch = content.match(/:root\s*\{[^}]+\}/);
-                rootBlock = rootMatch ? rootMatch[0] : "";
-            } catch (e) { console.warn("CSS Parse Error", e); }
-            
-            // Extract .dark block if exists
-            let darkBlock = "";
-            try {
-                const darkMatch = content.match(/\.dark\s*\{[^}]+\}/);
-                darkBlock = darkMatch ? darkMatch[0] : "";
-            } catch (e) { console.warn("CSS Parse Error", e); }
-
-            // Create a SAFE version for preview
-            files["/src/app/globals.css"] = `
-/* Safe Preview CSS - Generated by PreviewPanel */
-@layer base {
-  ${rootBlock}
-  ${darkBlock}
-}
-
-body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-feature-settings: "rlig" 1, "calt" 1;
-}
-
-* {
-  border-color: hsl(var(--border));
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-    width: 8px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted));
-    border-radius: 4px;
-}
-`;
+            let rootBlock = "", darkBlock = "";
+            try { rootBlock = content.match(/:root\s*\{[^}]+\}/)?.[0] || ""; } catch {}
+            try { darkBlock = content.match(/\.dark\s*\{[^}]+\}/)?.[0] || ""; } catch {}
+            files["/src/app/globals.css"] = `/* Safe Preview CSS */ @layer base { ${rootBlock} ${darkBlock} } body { background-color: hsl(var(--background)); color: hsl(var(--foreground)); } * { border-color: hsl(var(--border)); }`;
         }
 
         return files;
     } catch (error) {
         console.error("Error generating preview files:", error);
-        toast.error("Preview generation failed. Please check the code.");
         return {};
     }
   }, [generatedFiles, hasFiles]);
@@ -438,71 +396,35 @@ body {
             </div>
             
             <div className="flex-1 flex items-center bg-background border rounded-md h-7 px-3 text-xs text-muted-foreground">
-                <div className="flex-1 truncate">
-                    {viewMode === "preview" ? ((previewUrl === "sandpack" || (!previewUrl && hasFiles)) ? "Local Simulation" : previewUrl || "http://localhost:3000") : (selectedFile ? `view-source://${selectedFile}` : "Ready")}
+                <div className="flex-1 truncate flex items-center gap-2">
+                    {isFixing ? (
+                         <span className="text-amber-500 flex items-center gap-1 font-semibold animate-pulse">
+                            <Sparkles className="w-3 h-3" /> SELF-HEALING IN PROGRESS...
+                         </span>
+                    ) : (
+                        viewMode === "preview" ? ((previewUrl === "sandpack" || (!previewUrl && hasFiles)) ? "Local Simulation" : previewUrl || "http://localhost:3000") : (selectedFile ? `view-source://${selectedFile}` : "Ready")
+                    )}
                 </div>
                 {viewMode === "preview" && (previewUrl || hasFiles) && (
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-5 w-5 ml-2 hover:bg-transparent"
-                        onClick={handleRefresh}
-                        title="Force Refresh Preview"
-                    >
-                        <RefreshCw className="w-3 h-3" />
+                    <Button variant="ghost" size="icon" className="h-5 w-5 ml-2 hover:bg-transparent" onClick={handleRefresh} title="Force Refresh">
+                        <RefreshCw className={cn("w-3 h-3", isFixing && "animate-spin")} />
                     </Button>
                 )}
             </div>
 
             <div className="flex bg-muted rounded-lg p-0.5">
-                <button
-                    onClick={() => setViewMode("preview")}
-                    disabled={!canPreview}
-                    className={cn(
-                        "px-2 py-0.5 text-xs rounded-md transition-all",
-                        viewMode === "preview" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground",
-                        !canPreview && "opacity-50 cursor-not-allowed"
-                    )}
-                >
-                    Preview
-                </button>
-                <button
-                    onClick={() => setViewMode("code")}
-                    className={cn(
-                        "px-2 py-0.5 text-xs rounded-md transition-all",
-                        viewMode === "code" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
-                    )}
-                >
-                    Code
-                </button>
+                <button onClick={() => setViewMode("preview")} disabled={!canPreview} className={cn("px-2 py-0.5 text-xs rounded-md transition-all", viewMode === "preview" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground", !canPreview && "opacity-50 cursor-not-allowed")}>Preview</button>
+                <button onClick={() => setViewMode("code")} className={cn("px-2 py-0.5 text-xs rounded-md transition-all", viewMode === "code" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}>Code</button>
             </div>
 
             <div className="flex items-center gap-1 ml-2 border-l pl-2">
-                 <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                    onClick={handleDownload}
-                    title="Download Source Code"
-                 >
+                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={handleDownload} title="Download Source Code">
                     <Download className="w-4 h-4" />
                 </Button>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={cn("h-8 w-8 text-muted-foreground hover:text-indigo-400", isDeploying && "text-indigo-500 animate-pulse")}
-                    onClick={handleDeploy}
-                    title="Deploy to Production"
-                >
+                <Button variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-indigo-400", isDeploying && "text-indigo-500 animate-pulse")} onClick={handleDeploy} title="Deploy to Production">
                     <Rocket className="w-4 h-4" />
                 </Button>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                    onClick={handleExternalLink}
-                    title="Open in New Tab"
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={handleExternalLink} title="Open in New Tab">
                     <ExternalLink className="w-4 h-4" />
                 </Button>
             </div>
@@ -512,99 +434,61 @@ body {
         <div className="flex-1 relative bg-neutral-950 overflow-hidden">
             {viewMode === "preview" && canPreview ? (
                 (previewUrl === "sandpack" || (!previewUrl && hasFiles)) ? (
-                    <SandpackProvider 
-                        key={key}
-                        template="react-ts" // SWITCHED TO STANDARD REACT-TS FOR STABILITY
-                        theme="dark"
-                        files={sandpackFiles}
-                        style={{ height: "100%", width: "100%" }}
-                        options={{
-                            activeFile: "/App.tsx",
-                            initMode: "user-visible",
-                            initModeObserverOptions: { rootMargin: '1000px 0px' },
-                            externalResources: [
-                                "https://cdn.tailwindcss.com",
-                                "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap"
-                            ]
-                        }}
-                        customSetup={{
-                            dependencies: {
-                                "framer-motion": "^11.0.0",
-                                "lucide-react": "^0.300.0",
-                                "clsx": "^2.1.0",
-                                "tailwind-merge": "^2.2.0",
-                                "class-variance-authority": "^0.7.0",
-                                "mini-svg-data-uri": "^1.4.4",
-                                "tailwindcss-animate": "^1.0.7",
-                                "@radix-ui/react-slot": "^1.0.2",
-                                "@radix-ui/react-label": "^2.0.2",
-                                "@radix-ui/react-avatar": "^1.0.4",
-                                "@radix-ui/react-dialog": "^1.0.5",
-                                "@radix-ui/react-dropdown-menu": "^2.0.6",
-                                "@radix-ui/react-separator": "^1.0.3",
-                                "@radix-ui/react-switch": "^1.0.3",
-                                "@radix-ui/react-scroll-area": "^1.0.5",
-                                "@radix-ui/react-accordion": "^1.0.1",
-                                "@radix-ui/react-tabs": "^1.0.4",
-                                "@radix-ui/react-popover": "^1.0.7",
-                                "recharts": "^2.12.0",
-                                "date-fns": "^3.3.1"
-                            },
-                        }}
-                        options={{
-                            activeFile: "/App.tsx",
-                            initMode: "user-visible",
-                            initModeObserverOptions: { rootMargin: '1000px 0px' },
-                        }}
-                    >
-                        <SandpackLayout style={{ height: "100%", width: "100%", borderRadius: 0, border: "none" }}>
-                            <SandpackPreview 
-                                style={{ height: "100%", width: "100%" }} 
-                                showNavigator={false} 
-                                showOpenInCodeSandbox={false} 
-                                showRefreshButton={false}
-                                showRestartButton={false}
-                                actionsChildren={
-                                    <button 
-                                        onClick={handleRefresh}
-                                        className="p-2 text-white/50 hover:text-white transition-colors"
-                                        title="Reload Preview"
-                                    >
-                                        <RefreshCw className="w-4 h-4" />
-                                    </button>
-                                }
-                            />
-                        </SandpackLayout>
-                    </SandpackProvider>
+                    <div className="w-full h-full relative">
+                        {isFixing && (
+                            <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+                                <Loader2 className="w-10 h-10 animate-spin text-green-500 mb-4" />
+                                <h3 className="text-xl font-bold text-green-400">Superior Self-Healing Active</h3>
+                                <p className="text-neutral-400 text-sm mt-2">Correcting runtime errors automatically...</p>
+                            </div>
+                        )}
+                        <SandpackProvider 
+                            key={key}
+                            template="react-ts"
+                            theme="dark"
+                            files={sandpackFiles}
+                            style={{ height: "100%", width: "100%" }}
+                            options={{
+                                activeFile: "/App.tsx",
+                                initMode: "user-visible",
+                                initModeObserverOptions: { rootMargin: '1000px 0px' },
+                                externalResources: ["https://cdn.tailwindcss.com", "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap"]
+                            }}
+                            customSetup={{
+                                dependencies: {
+                                    "framer-motion": "^11.0.0", "lucide-react": "^0.300.0", "clsx": "^2.1.0", "tailwind-merge": "^2.2.0", "class-variance-authority": "^0.7.0", "mini-svg-data-uri": "^1.4.4", "tailwindcss-animate": "^1.0.7",
+                                    "@radix-ui/react-slot": "^1.0.2", "@radix-ui/react-label": "^2.0.2", "@radix-ui/react-avatar": "^1.0.4", "@radix-ui/react-dialog": "^1.0.5", "@radix-ui/react-dropdown-menu": "^2.0.6", "@radix-ui/react-separator": "^1.0.3", "@radix-ui/react-switch": "^1.0.3", "@radix-ui/react-scroll-area": "^1.0.5", "@radix-ui/react-accordion": "^1.0.1", "@radix-ui/react-tabs": "^1.0.4", "@radix-ui/react-popover": "^1.0.7",
+                                    "recharts": "^2.12.0", "date-fns": "^3.3.1"
+                                },
+                            }}
+                        >
+                            <SandpackLayout style={{ height: "100%", width: "100%", borderRadius: 0, border: "none" }}>
+                                <SandpackPreview 
+                                    style={{ height: "100%", width: "100%" }} 
+                                    showNavigator={false} showOpenInCodeSandbox={false} showRefreshButton={false} showRestartButton={false}
+                                    actionsChildren={
+                                        <button onClick={handleRefresh} className="p-2 text-white/50 hover:text-white transition-colors" title="Reload Preview">
+                                            <RefreshCw className="w-4 h-4" />
+                                        </button>
+                                    }
+                                />
+                            </SandpackLayout>
+                        </SandpackProvider>
+                    </div>
                 ) : (
-                    <iframe
-                        key={key}
-                        src={previewUrl || undefined}
-                        className="w-full h-full border-0"
-                        title="Live Preview"
-                    />
+                    <iframe key={key} src={previewUrl || undefined} className="w-full h-full border-0" title="Live Preview" />
                 )
             ) : viewMode === "code" ? (
                 <div className="flex h-full">
                     <div className="w-48 border-r bg-muted/10 flex flex-col">
-                        <div className="p-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Files
-                        </div>
+                        <div className="p-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Files</div>
                         <ScrollArea className="flex-1">
                             <div className="space-y-0.5 p-2">
                                 {generatedFiles.map((file: any, idx: number) => {
                                     if (!file || !file.path) return null;
                                     return (
-                                    <button
-                                        key={file.path || idx}
-                                        onClick={() => setSelectedFile(file.path)}
-                                        className={cn(
-                                            "w-full text-left px-2 py-1.5 text-xs rounded-md flex items-center gap-2 transition-colors",
-                                            selectedFile === file.path ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50"
-                                        )}
-                                    >
-                                        <FileCode className="w-3.5 h-3.5" />
-                                        <span className="truncate">{file.path.split('/').pop()}</span>
+                                    <button key={file.path || idx} onClick={() => setSelectedFile(file.path)} className={cn("w-full text-left px-2 py-1.5 text-xs rounded-md flex items-center gap-2 transition-colors", selectedFile === file.path ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50")}>
+                                        <FileCode className="w-3.5 h-3.5" /> <span className="truncate">{file.path.split('/').pop()}</span>
                                     </button>
                                     );
                                 })}
@@ -613,17 +497,13 @@ body {
                     </div>
                     <div className="flex-1 flex flex-col min-w-0">
                         <ScrollArea className="flex-1">
-                             <pre className="p-4 text-sm font-mono tab-4">
-                                <code>{selectedFileContent}</code>
-                            </pre>
+                             <pre className="p-4 text-sm font-mono tab-4"><code>{selectedFileContent}</code></pre>
                         </ScrollArea>
                     </div>
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
-                    <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
-                        <Code2 className="w-8 h-8 opacity-50" />
-                    </div>
+                    <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center"><Code2 className="w-8 h-8 opacity-50" /></div>
                     <p>No preview available. Generate code to see it here.</p>
                 </div>
             )}

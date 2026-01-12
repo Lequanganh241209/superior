@@ -430,13 +430,19 @@ const config = {
        - DO NOT import from \`@/components/icons\` or other non-standard paths. Use \`lucide-react\` directly.
        
     3. **DEFAULT EXPORTS (STRICT)**:
-       - EVERY component file (e.g., Navbar.tsx, Hero.tsx) **MUST** use \`export default function ComponentName() {...}\`.
-       - DO NOT use named exports (e.g., \`export const Navbar = ...\`) for main components. This causes "Element type is invalid" errors.
-       - Correct: \`export default function Navbar() { ... }\`
-       - Incorrect: \`export const Navbar = () => { ... }\`
+       - EVERY component file (e.g., Navbar.tsx, Hero.tsx) **MUST** use Named Exports: \`export const ComponentName = ...\` or \`export function ComponentName() {...}\`.
+       - DO NOT use \`export default\`. This causes confusion with named imports.
+       - Correct: \`export const Navbar = () => { ... }\`
+       - Incorrect: \`export default function Navbar() { ... }\`
        
     4. **NO RELATIVE IMPORTS OF MISSING FILES**:
        - If you didn't create it, don't import it.
+
+    ### RULE OF IMMUTABLE IMPORTS:
+    1. NEVER guess an export. Always use Named Exports: \`export const Name = ...\`.
+    2. BEFORE outputting, perform a 'Mental Render': Does every tag <Component /> have a matching \`import { Component }\`?
+    3. If using Lucide icons, ALWAYS use the pattern: \`import { IconName } from 'lucide-react'\`.
+    4. If a component is interactive, the VERY FIRST line must be \`'use client'\`.
 
     --------------------------------------------------------------------------------
     ### 4. DESIGN SYSTEM: "THE LOVABLE KILLER" (MANDATORY)
