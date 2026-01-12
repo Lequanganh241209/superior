@@ -38,6 +38,15 @@ const healPreview = async (p: Project) => {
 import { ProjectInit } from "@/components/dashboard/ProjectInit";
 import { Loader2 } from "lucide-react"; // Import Loader2 if not present or reuse DashboardSkeleton
 
+// Define EmptyState component outside to avoid re-creation
+function EmptyState() {
+  return (
+    <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center space-y-8 bg-zinc-950">
+        <ProjectInit />
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -103,11 +112,7 @@ export default function Dashboard() {
 
   // If no project is active, show Empty State
   if (!projectName) {
-      return (
-        <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center space-y-8 bg-zinc-950">
-            <ProjectInit />
-        </div>
-      );
+      return <EmptyState />;
   }
 
   // Render the new Split View Editor
