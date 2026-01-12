@@ -135,6 +135,7 @@ export function PreviewPanel() {
   // --- LISTENER FOR SANDBOX ERRORS ---
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+        // 1. Runtime Error from ErrorBoundary
         if (event.data?.type === "SANDBOX_RUNTIME_ERROR") {
             console.log("Superior Error Detector Caught:", event.data.message);
             // Trigger Auto-Fix
@@ -145,6 +146,23 @@ export function PreviewPanel() {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [generatedFiles, isFixing]); // Re-bind if files change to ensure freshness
+
+  // --- AUTONOMOUS ERROR DETECTOR (CONSOLE & 404) ---
+  // This effect simulates an agent watching the console logs of the preview
+  // Since we can't easily hook into Sandpack's internal console without the Console component,
+  // We rely on the ErrorBoundary for runtime errors.
+  // But for 404s (missing files), we can check generatedFiles directly.
+  useEffect(() => {
+      if (hasFiles && !isFixing) {
+          // Check if page.tsx exists
+          const hasPage = generatedFiles.some((f: any) => f.path.includes("page.tsx") || f.path.includes("App.tsx") || f.path.includes("index.tsx"));
+          if (!hasPage) {
+              // Trigger Auto-Fix for missing entry point
+              console.warn("CRITICAL: No entry point found. Triggering Self-Healing...");
+              handleAutoFix("CRITICAL ERROR: No 'page.tsx' or 'App.tsx' found in the generated files. The application cannot render. Please create a src/app/page.tsx file immediately.");
+          }
+      }
+  }, [generatedFiles, hasFiles, isFixing]);
 
   const hasFiles = generatedFiles && Array.isArray(generatedFiles) && generatedFiles.length > 0;
   
