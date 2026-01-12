@@ -217,6 +217,64 @@ export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 Card.displayName = "Card"
 `);
         }
+
+        // CRITICAL FIX: Ensure page.tsx exists!
+        // If AI forgets to generate the main page, we create a fallback one.
+        if (!out.find(f => f.path === "src/app/page.tsx")) {
+            // 1. Try to find a "hero" or "landing" component to render
+            const heroComponent = out.find(f => f.path.includes("hero") || f.path.includes("Hero"));
+            const landingComponents = out.filter(f => f.path.includes("src/components/landing/"));
+            
+            let pageContent = "";
+            
+            if (landingComponents.length > 0) {
+                // Auto-compose a page from landing components
+                const imports = landingComponents.map(f => {
+                    const name = f.path.split("/").pop()?.replace(".tsx", "") || "Component";
+                    const pascalName = name.charAt(0).toUpperCase() + name.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+                    return `import { ${pascalName} } from "@/components/landing/${name}";`;
+                }).join("\n");
+                
+                const components = landingComponents.map(f => {
+                    const name = f.path.split("/").pop()?.replace(".tsx", "") || "Component";
+                    const pascalName = name.charAt(0).toUpperCase() + name.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+                    return `<${pascalName} />`;
+                }).join("\n      ");
+
+                pageContent = `
+import React from "react";
+${imports}
+
+export default function Page() {
+  return (
+    <main className="min-h-screen bg-background">
+      ${components}
+    </main>
+  );
+}
+`;
+            } else {
+                // Fallback generic page
+                pageContent = `
+import React from "react";
+import { Button } from "@/components/ui/button";
+
+export default function Page() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
+      <h1 className="text-4xl font-bold mb-4">Project Initialized</h1>
+      <p className="text-muted-foreground mb-8">The AI generated the components, but missed the main page structure.</p>
+      <div className="p-4 border rounded-lg bg-muted/50">
+        <p className="text-sm font-mono">Check the "Code" tab to view generated components.</p>
+      </div>
+    </div>
+  );
+}
+`;
+            }
+            upsert("src/app/page.tsx", pageContent.trim());
+        }
+
         return out;
     };
     
