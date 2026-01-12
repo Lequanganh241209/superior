@@ -444,7 +444,7 @@ root.render(
                         )}
                         <SandpackProvider 
                             key={key}
-                            template="react-ts"
+                            template="vite-react-ts"
                             theme="dark"
                             files={sandpackFiles}
                             style={{ height: "100%", width: "100%" }}
@@ -456,9 +456,27 @@ root.render(
                             }}
                             customSetup={{
                                 dependencies: {
-                                    "framer-motion": "^11.0.0", "lucide-react": "^0.300.0", "clsx": "^2.1.0", "tailwind-merge": "^2.2.0", "class-variance-authority": "^0.7.0", "mini-svg-data-uri": "^1.4.4", "tailwindcss-animate": "^1.0.7",
-                                    "@radix-ui/react-slot": "^1.0.2", "@radix-ui/react-label": "^2.0.2", "@radix-ui/react-avatar": "^1.0.4", "@radix-ui/react-dialog": "^1.0.5", "@radix-ui/react-dropdown-menu": "^2.0.6", "@radix-ui/react-separator": "^1.0.3", "@radix-ui/react-switch": "^1.0.3", "@radix-ui/react-scroll-area": "^1.0.5", "@radix-ui/react-accordion": "^1.0.1", "@radix-ui/react-tabs": "^1.0.4", "@radix-ui/react-popover": "^1.0.7",
-                                    "recharts": "^2.12.0", "date-fns": "^3.3.1"
+                                    "framer-motion": "^11.0.0", 
+                                    "lucide-react": "^0.300.0", 
+                                    "clsx": "^2.1.0", 
+                                    "tailwind-merge": "^2.2.0", 
+                                    "class-variance-authority": "^0.7.0", 
+                                    "mini-svg-data-uri": "^1.4.4", 
+                                    "tailwindcss-animate": "^1.0.7",
+                                    "@radix-ui/react-slot": "^1.0.2", 
+                                    "@radix-ui/react-label": "^2.0.2", 
+                                    "@radix-ui/react-avatar": "^1.0.4", 
+                                    "@radix-ui/react-dialog": "^1.0.5", 
+                                    "@radix-ui/react-dropdown-menu": "^2.0.6", 
+                                    "@radix-ui/react-separator": "^1.0.3", 
+                                    "@radix-ui/react-switch": "^1.0.3", 
+                                    "@radix-ui/react-scroll-area": "^1.0.5", 
+                                    "@radix-ui/react-accordion": "^1.0.1", 
+                                    "@radix-ui/react-tabs": "^1.0.4", 
+                                    "@radix-ui/react-popover": "^1.0.7",
+                                    "recharts": "^2.12.0", 
+                                    "date-fns": "^3.3.1",
+                                    "react-router-dom": "^6.22.0" // Add router for navigation simulation
                                 },
                             }}
                         >
