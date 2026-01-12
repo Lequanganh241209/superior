@@ -376,132 +376,153 @@ export default function Page() {
         setCurrentStep(4);
         setStatus("Auditing Imports & Security...");
         
-        const ensuredFiles = ensureRequiredFiles(codeData.files).map((file) => {
-            const normalizedPath = (file.path || "").replace(/\\/g, "/");
-            const isCodeFile = normalizedPath.endsWith(".ts") || normalizedPath.endsWith(".tsx");
-            if (!isCodeFile) return file;
+        let ensuredFiles: { path: string; content: string }[] = [];
+        try {
+            if (!codeData.files || !Array.isArray(codeData.files)) {
+                throw new Error("Invalid file structure received from AI Architect.");
+            }
             
-            // AUTOMATIC FIX FOR "Element type is invalid"
-            // If AI generates "export const Navbar =" instead of "export default function Navbar", fix it.
-            let content = file.content || "";
-            
-            // SHADOW PROMPTING (Tip #1): Auto-Import standard UI components if missing
-            const uiComponents = [
-                { name: "Button", path: "@/components/ui/button" },
-                { name: "Card", path: "@/components/ui/card" },
-                { name: "Input", path: "@/components/ui/input" },
-                { name: "Badge", path: "@/components/ui/badge" },
-                { name: "Avatar", path: "@/components/ui/avatar" },
-                { name: "Accordion", path: "@/components/ui/accordion" },
-                { name: "Sheet", path: "@/components/ui/sheet" },
-                { name: "Dialog", path: "@/components/ui/dialog" },
-                { name: "DropdownMenu", path: "@/components/ui/dropdown-menu" },
-                { name: "Tabs", path: "@/components/ui/tabs" },
-                { name: "Textarea", path: "@/components/ui/textarea" },
-                { name: "Label", path: "@/components/ui/label" },
-                { name: "Select", path: "@/components/ui/select" },
-                { name: "Switch", path: "@/components/ui/switch" },
-                { name: "Separator", path: "@/components/ui/separator" },
-                { name: "ScrollArea", path: "@/components/ui/scroll-area" },
-            ];
-
-            uiComponents.forEach(comp => {
-                // If component is used (<Button) but not imported
-                if (content.includes(`<${comp.name}`) && !content.includes(`from "${comp.path}"`) && !content.includes(`from '${comp.path}'`)) {
-                    // Inject import at the top
-                    const importStmt = `import { ${comp.name} } from "${comp.path}";`;
-                    if (content.startsWith('"use client"')) {
-                        content = content.replace('"use client";', `"use client";\n${importStmt}`);
-                    } else if (content.startsWith("'use client'")) {
-                        content = content.replace("'use client';", `'use client';\n${importStmt}`);
-                    } else {
-                        content = `${importStmt}\n${content}`;
-                    }
-                }
-            });
-
-            // AUTOMATIC LINTER LAYER (Simple AST Scanner)
-            // Detect common undefined variable patterns
-            
-            // 0. Load Dependency Graph (Simulated import for client-side)
-            const dependencyGraph = {
-                "Button": "@/components/ui/button",
-                "Card": "@/components/ui/card", "CardContent": "@/components/ui/card", "CardHeader": "@/components/ui/card", "CardTitle": "@/components/ui/card",
-                "Input": "@/components/ui/input",
-                "Badge": "@/components/ui/badge",
-                "Avatar": "@/components/ui/avatar", "AvatarFallback": "@/components/ui/avatar", "AvatarImage": "@/components/ui/avatar",
-                "Accordion": "@/components/ui/accordion", "AccordionItem": "@/components/ui/accordion", "AccordionTrigger": "@/components/ui/accordion", "AccordionContent": "@/components/ui/accordion",
-                "Sheet": "@/components/ui/sheet", "SheetContent": "@/components/ui/sheet", "SheetTrigger": "@/components/ui/sheet",
-                "Tabs": "@/components/ui/tabs", "TabsList": "@/components/ui/tabs", "TabsTrigger": "@/components/ui/tabs", "TabsContent": "@/components/ui/tabs",
-                "Textarea": "@/components/ui/textarea",
-                "ScrollArea": "@/components/ui/scroll-area",
-                "motion": "framer-motion"
-            };
-
-            // 1. Check for UI Components used but not imported
-            Object.entries(dependencyGraph).forEach(([compName, importPath]) => {
-                 // Regex to find <Component usage
-                 const usageRegex = new RegExp(`<${compName}\\s|\\s${compName}\\.|<${compName}>`, 'g');
-                 if (usageRegex.test(content) && !content.includes(importPath) && !content.includes(`from "${importPath}"`)) {
-                     // Add import
-                     const importStmt = importPath === "framer-motion" 
-                        ? `import { ${compName} } from "${importPath}";`
-                        : `import { ${compName} } from "${importPath}";`;
-                     
-                     if (content.startsWith('"use client"')) {
-                        content = content.replace('"use client";', `"use client";\n${importStmt}`);
-                     } else {
-                        content = `${importStmt}\n${content}`;
-                     }
-                 }
-            });
-
-            // 2. Check for Lucide icons used but not imported
-            const iconMatches = content.match(/<([A-Z][a-zA-Z]+) className=/g);
-            if (iconMatches) {
-                const usedIcons = new Set(iconMatches.map(m => m.replace('<', '').replace(' className=', '')));
-                const lucideImports = content.match(/import {([^}]+)} from "lucide-react"/);
+            ensuredFiles = ensureRequiredFiles(codeData.files).map((file) => {
+                const normalizedPath = (file.path || "").replace(/\\/g, "/");
+                const isCodeFile = normalizedPath.endsWith(".ts") || normalizedPath.endsWith(".tsx");
+                if (!isCodeFile) return file;
                 
-                // If lucide is imported, check if we need to add more
-                if (lucideImports) {
-                    const importedIcons = new Set(lucideImports[1].split(',').map(i => i.trim()));
-                    const missingIcons = Array.from(usedIcons).filter(icon => !importedIcons.has(icon) && !uiComponents.some(c => c.name === icon));
+                // AUTOMATIC FIX FOR "Element type is invalid"
+                // If AI generates "export const Navbar =" instead of "export default function Navbar", fix it.
+                let content = file.content || "";
+                
+                // SHADOW PROMPTING (Tip #1): Auto-Import standard UI components if missing
+                const uiComponents = [
+                    { name: "Button", path: "@/components/ui/button" },
+                    { name: "Card", path: "@/components/ui/card" },
+                    { name: "Input", path: "@/components/ui/input" },
+                    { name: "Badge", path: "@/components/ui/badge" },
+                    { name: "Avatar", path: "@/components/ui/avatar" },
+                    { name: "Accordion", path: "@/components/ui/accordion" },
+                    { name: "Sheet", path: "@/components/ui/sheet" },
+                    { name: "Dialog", path: "@/components/ui/dialog" },
+                    { name: "DropdownMenu", path: "@/components/ui/dropdown-menu" },
+                    { name: "Tabs", path: "@/components/ui/tabs" },
+                    { name: "Textarea", path: "@/components/ui/textarea" },
+                    { name: "Label", path: "@/components/ui/label" },
+                    { name: "Select", path: "@/components/ui/select" },
+                    { name: "Switch", path: "@/components/ui/switch" },
+                    { name: "Separator", path: "@/components/ui/separator" },
+                    { name: "ScrollArea", path: "@/components/ui/scroll-area" },
+                ];
+
+                uiComponents.forEach(comp => {
+                    // If component is used (<Button) but not imported
+                    if (content.includes(`<${comp.name}`) && !content.includes(`from "${comp.path}"`) && !content.includes(`from '${comp.path}'`)) {
+                        // Inject import at the top
+                        const importStmt = `import { ${comp.name} } from "${comp.path}";`;
+                        if (content.startsWith('"use client"')) {
+                            content = content.replace('"use client";', `"use client";\n${importStmt}`);
+                        } else if (content.startsWith("'use client'")) {
+                            content = content.replace("'use client';", `'use client';\n${importStmt}`);
+                        } else {
+                            content = `${importStmt}\n${content}`;
+                        }
+                    }
+                });
+
+                // AUTOMATIC LINTER LAYER (Simple AST Scanner)
+                // Detect common undefined variable patterns
+                
+                // 0. Load Dependency Graph (Simulated import for client-side)
+                const dependencyGraph = {
+                    "Button": "@/components/ui/button",
+                    "Card": "@/components/ui/card", "CardContent": "@/components/ui/card", "CardHeader": "@/components/ui/card", "CardTitle": "@/components/ui/card",
+                    "Input": "@/components/ui/input",
+                    "Badge": "@/components/ui/badge",
+                    "Avatar": "@/components/ui/avatar", "AvatarFallback": "@/components/ui/avatar", "AvatarImage": "@/components/ui/avatar",
+                    "Accordion": "@/components/ui/accordion", "AccordionItem": "@/components/ui/accordion", "AccordionTrigger": "@/components/ui/accordion", "AccordionContent": "@/components/ui/accordion",
+                    "Sheet": "@/components/ui/sheet", "SheetContent": "@/components/ui/sheet", "SheetTrigger": "@/components/ui/sheet",
+                    "Tabs": "@/components/ui/tabs", "TabsList": "@/components/ui/tabs", "TabsTrigger": "@/components/ui/tabs", "TabsContent": "@/components/ui/tabs",
+                    "Textarea": "@/components/ui/textarea",
+                    "ScrollArea": "@/components/ui/scroll-area",
+                    "motion": "framer-motion"
+                };
+
+                // 1. Check for UI Components used but not imported
+                Object.entries(dependencyGraph).forEach(([compName, importPath]) => {
+                     // Regex to find <Component usage
+                     const usageRegex = new RegExp(`<${compName}\\s|\\s${compName}\\.|<${compName}>`, 'g');
+                     if (usageRegex.test(content) && !content.includes(importPath) && !content.includes(`from "${importPath}"`)) {
+                         // Add import
+                         const importStmt = importPath === "framer-motion" 
+                            ? `import { ${compName} } from "${importPath}";`
+                            : `import { ${compName} } from "${importPath}";`;
+                         
+                         if (content.startsWith('"use client"')) {
+                            content = content.replace('"use client";', `"use client";\n${importStmt}`);
+                         } else {
+                            content = `${importStmt}\n${content}`;
+                         }
+                     }
+                });
+
+                // 2. Check for Lucide icons used but not imported
+                const iconMatches = content.match(/<([A-Z][a-zA-Z]+) className=/g);
+                if (iconMatches) {
+                    const usedIcons = new Set(iconMatches.map(m => m.replace('<', '').replace(' className=', '')));
+                    const lucideImports = content.match(/import {([^}]+)} from "lucide-react"/);
                     
-                    if (missingIcons.length > 0) {
-                        const newImports = [...importedIcons, ...missingIcons].join(', ');
-                        content = content.replace(/import {([^}]+)} from "lucide-react"/, `import { ${newImports} } from "lucide-react"`);
+                    // If lucide is imported, check if we need to add more
+                    if (lucideImports) {
+                        const importedIcons = new Set(lucideImports[1].split(',').map(i => i.trim()));
+                        const missingIcons = Array.from(usedIcons).filter(icon => !importedIcons.has(icon) && !uiComponents.some(c => c.name === icon));
+                        
+                        if (missingIcons.length > 0) {
+                            const newImports = [...importedIcons, ...missingIcons].join(', ');
+                            content = content.replace(/import {([^}]+)} from "lucide-react"/, `import { ${newImports} } from "lucide-react"`);
+                        }
                     }
                 }
-            }
 
-            // Fix 1: Removed outdated "Force default export" logic.
-            // We now strictly enforce Named Exports.
-            // If we find `export default function`, we change it to `export function`
-            // and remove the `export default` line if separate.
+                // Fix 1: Removed outdated "Force default export" logic.
+                // We now strictly enforce Named Exports.
+                // If we find `export default function`, we change it to `export function`
+                // and remove the `export default` line if separate.
 
-            if (normalizedPath.includes("components/")) {
-                if (content.includes("export default function")) {
-                     content = content.replace("export default function", "export function");
-                } else if (content.includes("export default class")) {
-                     content = content.replace("export default class", "export class");
+                if (normalizedPath.includes("components/")) {
+                    if (content.includes("export default function")) {
+                         content = content.replace("export default function", "export function");
+                    } else if (content.includes("export default class")) {
+                         content = content.replace("export default class", "export class");
+                    }
+                    // Handle `export default ComponentName` at the end
+                    // We keep it for safety but ensure named export exists too.
                 }
-                // Handle `export default ComponentName` at the end
-                // We keep it for safety but ensure named export exists too.
-            }
 
-            // Fix 2: Convert "export const Navbar" to "function Navbar" if needed for default export
-            // (Removed as we now prefer Named Exports)
-            
-            const parts = normalizedPath.split("/");
-            const depth = parts[0] === "src" ? Math.max(parts.length - 2, 0) : 0;
-            const relativePrefix = depth > 0 ? "../".repeat(depth) : "./";
-            content = content.replace(/(['"])@\//g, `$1${relativePrefix}`);
-            
-            return { ...file, content };
-        });
+                // Fix 2: Convert "export const Navbar" to "function Navbar" if needed for default export
+                // (Removed as we now prefer Named Exports)
+                
+                const parts = normalizedPath.split("/");
+                const depth = parts[0] === "src" ? Math.max(parts.length - 2, 0) : 0;
+                const relativePrefix = depth > 0 ? "../".repeat(depth) : "./";
+                try {
+                    content = content.replace(/(['"])@\//g, `$1${relativePrefix}`);
+                } catch (e) {
+                    // Ignore regex errors
+                }
+                
+                return { ...file, content };
+            });
+        } catch (e: any) {
+            console.error("Auditing failed:", e);
+            addLog(`WARNING: Auditing skipped due to error: ${e.message}`);
+            // Fallback to raw files if audit crashes
+            ensuredFiles = codeData.files || [];
+        }
         
         // CRITICAL: Update Store with generated files so Preview Panel works immediately
-        setGeneratedFiles(ensuredFiles);
+        try {
+            setGeneratedFiles(ensuredFiles);
+        } catch (e: any) {
+            console.error("State update failed:", e);
+            addLog(`CRITICAL WARNING: Failed to update local state (Memory Limit?). Deployment will continue.`);
+        }
         
         addLog(`Code Generation Complete: ${ensuredFiles.length} files ready.`);
 
