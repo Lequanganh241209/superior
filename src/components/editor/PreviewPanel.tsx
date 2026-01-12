@@ -283,9 +283,21 @@ export default function App() {
         delete files["/postcss.config.js"];
         delete files["/tailwind.config.ts"];
         delete files["/next.config.mjs"];
-        // Also remove vite.config.js if AI generated it, as Sandpack handles its own config
-        delete files["/vite.config.ts"];
-        delete files["/vite.config.js"];
+        
+        // INJECT VITE CONFIG TO HANDLE ALIASES (@/ -> /src/)
+        files["/vite.config.ts"] = `
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': '/src',
+    },
+  },
+})
+`;
 
         // NEXT.JS SHIMS (CRITICAL FOR 99% SUCCESS)
         // Since we are running in Vite (Sandpack), Next.js specific modules like next/link, next/image, next/navigation
