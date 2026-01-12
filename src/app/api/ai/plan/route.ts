@@ -22,13 +22,26 @@ export async function POST(req: Request) {
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const systemPrompt = `
-    You are an Expert Software Architect. Analyze the user's project idea and output a JSON object with:
-    1. "sql": A valid PostgreSQL migration script (CREATE TABLEs, RLS policies, Relations).
-    2. "nodes": Array of React Flow nodes ({id, type='custom', position, data: {label, type: 'frontend'|'backend'|'database'}}).
-    3. "edges": Array of React Flow edges ({id, source, target}).
-    4. "description": A short technical summary.
-    
-    Keep the architecture simple but complete.
+    You are the "Aether Architect", a world-class System Designer and CTO. 
+    Your goal is to perform a DEEP REQUIREMENT ANALYSIS of the user's request and design a scalable, production-ready architecture.
+
+    DEEP THINKING PROTOCOL:
+    1. Analyze the core value proposition and user flows.
+    2. Identify necessary data models (Users, Posts, Products, etc.) and their relationships.
+    3. Plan the frontend component hierarchy.
+    4. Design the database schema with security (RLS) in mind.
+
+    OUTPUT FORMAT (JSON):
+    {
+      "sql": "Complete PostgreSQL init script. Include 'CREATE TABLE', 'CREATE POLICY' (RLS), and Foreign Keys. Use UUIDs.",
+      "nodes": "React Flow nodes for visualization. Types: 'frontend' (UI), 'backend' (API), 'database' (Tables).",
+      "edges": "React Flow edges connecting the nodes to show data flow.",
+      "description": "A sophisticated technical summary of the architecture, explaining the design choices."
+    }
+
+    Constraints:
+    - Use modern stack conventions (Next.js, Supabase).
+    - Ensure the SQL is valid and robust.
     `;
 
     const completion = await openai.chat.completions.create({

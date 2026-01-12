@@ -7,11 +7,16 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
+import { BuildProgress, BuildSteps } from "./BuildProgress";
 
 export function ProjectInit() {
-  const { isInitializing, setInitializing, setProjectDetails, setHighlightedTab, setWorkflow, setGeneratedSQL, setPreviewUrl } = useProjectStore();
+  const { isInitializing, setInitializing, setProjectDetails, setHighlightedTab, setWorkflow, setGeneratedSQL, setPreviewUrl, setGeneratedFiles } = useProjectStore();
   const [input, setInput] = useState("");
   const [projectName, setProjectNameInput] = useState("");
+  
+  // Aether Architect State
+  const [currentStep, setCurrentStep] = useState(0);
+  const [status, setStatus] = useState("Idle");
 
   const [deployData, setDeployData] = useState<{ url: string, dashboard: string } | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
@@ -20,6 +25,8 @@ export function ProjectInit() {
 
   const handleReset = () => {
       setInitializing(false);
+      setCurrentStep(0);
+      setStatus("Idle");
       setLogs([]);
       toast.info("System State Reset");
   };
@@ -297,13 +304,17 @@ export default function Page() {
 
     setInitializing(true);
     setLogs([]);
+    
+    // Aether Architect: Step 1
+    setCurrentStep(1);
+    setStatus("Analyzing System Requirements...");
+    
     addLog("SUPREME ORCHESTRATOR ACTIVATED...");
     const toastId = toast.loading("Supreme Orchestrator Activated...", { duration: Infinity });
 
     try {
         // 1. PLANNING PHASE
         addLog("PHASE 1: ARCHITECTING SYSTEM STRUCTURE...");
-        toast.loading("Phase 1: Architecting System Structure...", { id: toastId });
         
         const planRes = await fetch('/api/ai/plan', {
             method: 'POST',
@@ -327,14 +338,22 @@ export default function Page() {
             setWorkflow({ nodes: plan.nodes, edges: plan.edges });
         }
 
+        // Aether Architect: Step 2
+        setCurrentStep(2);
+        setStatus("Mapping Dependencies & Architecture...");
+
         // 2. CODING PHASE
         addLog("PHASE 2: GENERATING FULL-STACK SOURCE CODE...");
         toast.loading("Phase 2: Generating Full-Stack Source Code...", { id: toastId });
         
         // ARTIFICIAL DELAY FOR UX "THOUGHT PROCESS" VISIBILITY
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 1500)); // Increased for Step 2 visibility
         addLog(">> Analyzing UX Patterns & Design System...");
-        await new Promise(r => setTimeout(r, 800));
+        
+        // Aether Architect: Step 3
+        setCurrentStep(3);
+        setStatus("Generating Atomic Components...");
+        
         addLog(">> Selecting Optimal Component Architecture...");
         await new Promise(r => setTimeout(r, 800));
         addLog(">> Injecting Framer Motion Animations...");
@@ -352,6 +371,10 @@ export default function Page() {
         } catch (e: any) {
             throw new Error("Code generation failed. Please check your API keys or try again.");
         }
+        
+        // Aether Architect: Step 4
+        setCurrentStep(4);
+        setStatus("Auditing Imports & Security...");
         
         const ensuredFiles = ensureRequiredFiles(codeData.files).map((file) => {
             const normalizedPath = (file.path || "").replace(/\\/g, "/");
@@ -482,6 +505,10 @@ export default function Page() {
         
         addLog(`Code Generation Complete: ${ensuredFiles.length} files ready.`);
 
+        // Aether Architect: Step 5
+        setCurrentStep(5);
+        setStatus("Deploying to Virtual File System...");
+
         // 3. DEPLOYMENT PHASE
         addLog(`PHASE 3: PUSHING TO GITHUB (${slug})...`);
         toast.loading(`Phase 3: Pushing to GitHub (${slug})...`, { id: toastId });
@@ -534,6 +561,10 @@ export default function Page() {
           url: deployData.deployUrl || `https://${projectName}.vercel.app`,
           dashboard: deployData.dashboardUrl
         });
+        
+        // Final State
+        setCurrentStep(6);
+        setStatus("System Online");
         
         // Write metadata file to repo for Projects listing
         try {
@@ -643,6 +674,7 @@ export default function Page() {
             </div>
 
             {/* Inputs */}
+            {currentStep === 0 && (
             <div className="space-y-5">
                 <div>
                     <label className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-2">
@@ -679,8 +711,10 @@ export default function Page() {
                     </div>
                 </div>
             </div>
+            )}
 
             {/* Action Area */}
+            {currentStep === 0 && (
             <div className="mt-8 flex gap-3">
                 <button 
                     onClick={handleInitialize}
@@ -711,6 +745,14 @@ export default function Page() {
                     </button>
                 )}
             </div>
+            )}
+
+            {/* Aether Architect Progress */}
+            {currentStep > 0 && (
+                <div className="mt-6">
+                    <BuildProgress currentStep={currentStep} status={status} />
+                </div>
+            )}
 
             {/* Live Logs Terminal */}
             {logs.length > 0 && (
