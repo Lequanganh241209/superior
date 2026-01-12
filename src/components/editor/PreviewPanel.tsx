@@ -340,6 +340,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { '@': '/src' } },
+  clearScreen: false,
 })
 `;
 
@@ -456,6 +457,8 @@ root.render(
                             }}
                             customSetup={{
                                 dependencies: {
+                                    "vite": "^5.0.0",
+                                    "@vitejs/plugin-react": "^4.2.0",
                                     "framer-motion": "^11.0.0", 
                                     "lucide-react": "^0.300.0", 
                                     "clsx": "^2.1.0", 
@@ -476,7 +479,7 @@ root.render(
                                     "@radix-ui/react-popover": "^1.0.7",
                                     "recharts": "^2.12.0", 
                                     "date-fns": "^3.3.1",
-                                    "react-router-dom": "^6.22.0" // Add router for navigation simulation
+                                    "react-router-dom": "^6.22.0"
                                 },
                             }}
                         >
