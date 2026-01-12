@@ -396,21 +396,19 @@ export default function Page() {
             throw new Error("Code generation failed. Please check your API keys or try again.");
         }
         
-        // Aether Architect: Step 4
-        setWizardStep(4);
-        setWizardStatus("Auditing Imports & Security...");
-        
-        let ensuredFiles: { path: string; content: string }[] = [];
-        try {
-            if (!codeData || !codeData.files || !Array.isArray(codeData.files)) {
-                // If codeData is null or invalid, fallback to empty array but don't crash
-                console.error("Invalid codeData structure:", codeData);
-                ensuredFiles = [];
-                // Maybe throw to stop deployment? Or continue with empty?
-                // For robustness, let's try to continue if we have a plan, otherwise stop.
-                if (!plan) throw new Error("Critical Failure: AI Architect produced no code.");
-            } else {
-                ensuredFiles = ensureRequiredFiles(codeData.files).map((file) => {
+    // Aether Architect: Step 4
+    setWizardStep(4);
+    setWizardStatus("Auditing Imports & Security...");
+    
+    let ensuredFiles: { path: string; content: string }[] = [];
+    try {
+        if (!codeData || !codeData.files || !Array.isArray(codeData.files)) {
+            console.error("Invalid codeData structure:", codeData);
+            // Fallback: Generate a basic page if AI fails completely
+            ensuredFiles = ensureRequiredFiles([]);
+            addWizardLog("WARNING: AI Architect output was empty. Using emergency fallback structure.");
+        } else {
+            ensuredFiles = ensureRequiredFiles(codeData.files).map((file) => {
                 const normalizedPath = (file.path || "").replace(/\\/g, "/");
                 const isCodeFile = normalizedPath.endsWith(".ts") || normalizedPath.endsWith(".tsx");
                 if (!isCodeFile) return file;
