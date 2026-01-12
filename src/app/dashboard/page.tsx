@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { SplitView } from "@/components/editor/SplitView";
 import { useProjectStore } from "@/store/project-store";
-import { Plus, Terminal, Sparkles, FolderOpen } from "lucide-react";
+import { Plus, Terminal, Sparkles, FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/dashboard/SkeletonLoader";
+import { ProjectInit } from "@/components/dashboard/ProjectInit";
 
 interface Project {
   id: string;
@@ -34,9 +35,6 @@ const healPreview = async (p: Project) => {
   } catch {}
   return p.deployment_url;
 };
-
-import { ProjectInit } from "@/components/dashboard/ProjectInit";
-import { Loader2 } from "lucide-react"; // Import Loader2 if not present or reuse DashboardSkeleton
 
 // Define EmptyState component outside to avoid re-creation
 function EmptyState() {
