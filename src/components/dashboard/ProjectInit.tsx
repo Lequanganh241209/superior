@@ -10,30 +10,50 @@ import { supabase } from "@/lib/supabase/client";
 import { BuildProgress, BuildSteps } from "./BuildProgress";
 
 export function ProjectInit() {
-  const { isInitializing, setInitializing, setProjectDetails, setHighlightedTab, setWorkflow, setGeneratedSQL, setPreviewUrl, setGeneratedFiles } = useProjectStore();
-  const [input, setInput] = useState("");
-  const [projectName, setProjectNameInput] = useState("");
+  const { 
+    isInitializing, setInitializing, 
+    setProjectDetails, setHighlightedTab, setWorkflow, setGeneratedSQL, setPreviewUrl, setGeneratedFiles,
+    // Wizard State from Store
+    wizardStep, setWizardStep,
+    wizardStatus, setWizardStatus,
+    wizardLogs, addWizardLog, clearWizardLogs,
+    projectName: storedProjectName,
+    autoBuildPrompt: storedPrompt,
+    setAutoBuildPrompt,
+    createProject
+  } = useProjectStore();
+
+  const [input, setInput] = useState(storedPrompt || "");
+  const [projectName, setProjectNameInput] = useState(storedProjectName || "");
   
-  // Aether Architect State
-  const [currentStep, setCurrentStep] = useState(0);
-  const [status, setStatus] = useState("Idle");
-
   const [deployData, setDeployData] = useState<{ url: string, dashboard: string } | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
 
-  const addLog = (msg: string) => setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+  // Sync local input to store for persistence
+  useEffect(() => {
+    if (input) setAutoBuildPrompt(input);
+  }, [input, setAutoBuildPrompt]);
+
+  useEffect(() => {
+      // If we have a project name in store but not in local state, sync it
+      if (storedProjectName && !projectName) {
+          setProjectNameInput(storedProjectName);
+      }
+  }, [storedProjectName]);
 
   const handleReset = () => {
       setInitializing(false);
-      setCurrentStep(0);
-      setStatus("Idle");
-      setLogs([]);
+      setWizardStep(0);
+      setWizardStatus("Idle");
+      clearWizardLogs();
       toast.info("System State Reset");
   };
 
   const handleInitialize = async () => {
     if (!input.trim() || !projectName.trim()) return;
     
+    // Create Project in Store immediately for persistence
+    createProject(projectName, input);
+
     const slug = projectName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-_]/g, "");
     const parse = async (res: Response) => {
         const text = await res.text();
@@ -303,18 +323,18 @@ export default function Page() {
     }
 
     setInitializing(true);
-    setLogs([]);
+    clearWizardLogs();
     
     // Aether Architect: Step 1
-    setCurrentStep(1);
-    setStatus("Analyzing System Requirements...");
+    setWizardStep(1);
+    setWizardStatus("Analyzing System Requirements...");
     
-    addLog("SUPREME ORCHESTRATOR ACTIVATED...");
+    addWizardLog("SUPREME ORCHESTRATOR ACTIVATED...");
     const toastId = toast.loading("Supreme Orchestrator Activated...", { duration: Infinity });
 
     try {
         // 1. PLANNING PHASE
-        addLog("PHASE 1: ARCHITECTING SYSTEM STRUCTURE...");
+        addWizardLog("PHASE 1: ARCHITECTING SYSTEM STRUCTURE...");
         
         const planRes = await fetch('/api/ai/plan', {
             method: 'POST',
@@ -330,7 +350,7 @@ export default function Page() {
              throw new Error("Plan generation failed. Please check your API keys or try again.");
         }
         
-        addLog("Blueprint Generated: SQL Schema & Workflow Nodes Ready.");
+        addWizardLog("Blueprint Generated: SQL Schema & Workflow Nodes Ready.");
         
         // Sync State
         setGeneratedSQL(plan.sql);
@@ -339,24 +359,24 @@ export default function Page() {
         }
 
         // Aether Architect: Step 2
-        setCurrentStep(2);
-        setStatus("Mapping Dependencies & Architecture...");
+        setWizardStep(2);
+        setWizardStatus("Mapping Dependencies & Architecture...");
 
         // 2. CODING PHASE
-        addLog("PHASE 2: GENERATING FULL-STACK SOURCE CODE...");
+        addWizardLog("PHASE 2: GENERATING FULL-STACK SOURCE CODE...");
         toast.loading("Phase 2: Generating Full-Stack Source Code...", { id: toastId });
         
         // ARTIFICIAL DELAY FOR UX "THOUGHT PROCESS" VISIBILITY
         await new Promise(r => setTimeout(r, 1500)); // Increased for Step 2 visibility
-        addLog(">> Analyzing UX Patterns & Design System...");
+        addWizardLog(">> Analyzing UX Patterns & Design System...");
         
         // Aether Architect: Step 3
-        setCurrentStep(3);
-        setStatus("Generating Atomic Components...");
+        setWizardStep(3);
+        setWizardStatus("Generating Atomic Components...");
         
-        addLog(">> Selecting Optimal Component Architecture...");
+        addWizardLog(">> Selecting Optimal Component Architecture...");
         await new Promise(r => setTimeout(r, 800));
-        addLog(">> Injecting Framer Motion Animations...");
+        addWizardLog(">> Injecting Framer Motion Animations...");
         
         const codeRes = await fetch('/api/ai/codegen', {
             method: 'POST',
@@ -373,8 +393,8 @@ export default function Page() {
         }
         
         // Aether Architect: Step 4
-        setCurrentStep(4);
-        setStatus("Auditing Imports & Security...");
+        setWizardStep(4);
+        setWizardStatus("Auditing Imports & Security...");
         
         let ensuredFiles: { path: string; content: string }[] = [];
         try {
@@ -511,7 +531,7 @@ export default function Page() {
             });
         } catch (e: any) {
             console.error("Auditing failed:", e);
-            addLog(`WARNING: Auditing skipped due to error: ${e.message}`);
+            addWizardLog(`WARNING: Auditing skipped due to error: ${e.message}`);
             // Fallback to raw files if audit crashes
             ensuredFiles = codeData.files || [];
         }
@@ -521,17 +541,17 @@ export default function Page() {
             setGeneratedFiles(ensuredFiles);
         } catch (e: any) {
             console.error("State update failed:", e);
-            addLog(`CRITICAL WARNING: Failed to update local state (Memory Limit?). Deployment will continue.`);
+            addWizardLog(`CRITICAL WARNING: Failed to update local state (Memory Limit?). Deployment will continue.`);
         }
         
-        addLog(`Code Generation Complete: ${ensuredFiles.length} files ready.`);
+        addWizardLog(`Code Generation Complete: ${ensuredFiles.length} files ready.`);
 
         // Aether Architect: Step 5
-        setCurrentStep(5);
-        setStatus("Deploying to Virtual File System...");
+        setWizardStep(5);
+        setWizardStatus("Deploying to Virtual File System...");
 
         // 3. DEPLOYMENT PHASE
-        addLog(`PHASE 3: PUSHING TO GITHUB (${slug})...`);
+        addWizardLog(`PHASE 3: PUSHING TO GITHUB (${slug})...`);
         toast.loading(`Phase 3: Pushing to GitHub (${slug})...`, { id: toastId });
         
         const repoRes = await fetch('/api/github/create', {
@@ -550,13 +570,13 @@ export default function Page() {
         try {
             repoData = await parse(repoRes);
         } catch (e: any) {
-            addLog("GitHub unavailable. Switching to direct Vercel deployment.");
+            addWizardLog("GitHub unavailable. Switching to direct Vercel deployment.");
             repoData = { repoId: 0, repoUrl: "", repoName: slug };
         }
 
-        addLog(`Repository Created: ${repoData.repoUrl}`);
+        addWizardLog(`Repository Created: ${repoData.repoUrl}`);
 
-        addLog("PHASE 4: TRIGGERING VERCEL DEPLOYMENT...");
+        addWizardLog("PHASE 4: TRIGGERING VERCEL DEPLOYMENT...");
         toast.loading("Phase 4: Triggering Vercel Deployment...", { id: toastId });
         
         const deployRes = await fetch('/api/deploy/create', {
@@ -573,7 +593,7 @@ export default function Page() {
         });
         const deployData = await parse(deployRes);
 
-        addLog(`Deployment Triggered: ${deployData.deployUrl}`);
+        addWizardLog(`Deployment Triggered: ${deployData.deployUrl}`);
 
         // SUCCESS
         setProjectDetails(repoData.repoName, repoData.repoUrl);
@@ -584,8 +604,8 @@ export default function Page() {
         });
         
         // Final State
-        setCurrentStep(6);
-        setStatus("System Online");
+        setWizardStep(6);
+        setWizardStatus("System Online");
         
         // Write metadata file to repo for Projects listing
         try {
@@ -605,7 +625,7 @@ export default function Page() {
             });
         } catch {}
         
-        addLog("MISSION ACCOMPLISHED. SYSTEM ONLINE.");
+        addWizardLog("MISSION ACCOMPLISHED. SYSTEM ONLINE.");
         toast.success("System Successfully Orchestrated & Deployed!", { id: toastId });
         
         // Switch to Preview tab to show results
@@ -615,7 +635,7 @@ export default function Page() {
 
     } catch (err: any) {
         console.error(err);
-        addLog(`CRITICAL ERROR: ${err.message}`);
+        addWizardLog(`CRITICAL ERROR: ${err.message}`);
         toast.error(`Orchestration Failed: ${err.message}`, { id: toastId });
     } finally {
         setInitializing(false);
@@ -655,7 +675,7 @@ export default function Page() {
             </div>
 
             <button 
-                onClick={() => { setDeployData(null); setInput(""); setProjectNameInput(""); setLogs([]); }}
+                onClick={() => { setDeployData(null); setInput(""); setProjectNameInput(""); clearWizardLogs(); }}
                 className="w-full py-3 bg-primary/10 text-primary hover:bg-primary/20 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2"
             >
                 <Rocket className="w-4 h-4" /> Initialize Another System
@@ -695,7 +715,7 @@ export default function Page() {
             </div>
 
             {/* Inputs */}
-            {currentStep === 0 && (
+            {wizardStep === 0 && (
             <div className="space-y-5">
                 <div>
                     <label className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-2">
@@ -735,7 +755,7 @@ export default function Page() {
             )}
 
             {/* Action Area */}
-            {currentStep === 0 && (
+            {wizardStep === 0 && (
             <div className="mt-8 flex gap-3">
                 <button 
                     onClick={handleInitialize}
@@ -758,7 +778,7 @@ export default function Page() {
                         onClick={() => {
                             setInitializing(false);
                             toast.error("Orchestration Aborted by User");
-                            addLog("MANUAL ABORT INITIATED.");
+                            addWizardLog("MANUAL ABORT INITIATED.");
                         }}
                         className="px-6 py-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors font-bold text-sm tracking-wide"
                     >
@@ -769,14 +789,14 @@ export default function Page() {
             )}
 
             {/* Aether Architect Progress */}
-            {currentStep > 0 && (
+            {wizardStep > 0 && (
                 <div className="mt-6">
-                    <BuildProgress currentStep={currentStep} status={status} />
+                    <BuildProgress currentStep={wizardStep} status={wizardStatus} />
                 </div>
             )}
 
             {/* Live Logs Terminal */}
-            {logs.length > 0 && (
+            {wizardLogs.length > 0 && (
                 <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -791,7 +811,7 @@ export default function Page() {
                         </div>
                     </div>
                     <div className="space-y-1.5">
-                        {logs.map((log, i) => (
+                        {wizardLogs.map((log, i) => (
                             <div key={i} className="text-green-400/80 break-words font-light tracking-wide flex gap-2">
                                 <span className="text-green-600 opacity-50">➜</span>
                                 <span>{log}</span>

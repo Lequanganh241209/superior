@@ -37,14 +37,6 @@ const healPreview = async (p: Project) => {
 
 import { ProjectInit } from "@/components/dashboard/ProjectInit";
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
-  return (
-    <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center space-y-8 bg-zinc-950">
-        <ProjectInit />
-    </div>
-  );
-}
-
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -123,7 +115,11 @@ export default function Dashboard() {
 
   // If no project is active, show Empty State
   if (!projectName) {
-      return <EmptyState onCreate={() => createProject("New Project", "")} />;
+      return (
+        <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center space-y-8 bg-zinc-950">
+            <ProjectInit />
+        </div>
+      );
   }
 
   // Render the new Split View Editor

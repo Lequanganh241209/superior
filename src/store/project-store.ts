@@ -37,7 +37,17 @@ interface ProjectState {
   generatedSQL: string | null;
   generatedFiles: any[];
 
+  // Aether Architect State (Wizard)
+  wizardStep: number;
+  wizardStatus: string;
+  wizardLogs: string[];
+  
   // Actions
+  setWizardStep: (step: number) => void;
+  setWizardStatus: (status: string) => void;
+  addWizardLog: (log: string) => void;
+  clearWizardLogs: () => void;
+  
   setInitializing: (status: boolean) => void;
   setProjectDetails: (name: string, repoUrl: string) => void;
   setPreviewUrl: (url: string | null) => void;
@@ -71,6 +81,16 @@ export const useProjectStore = create<ProjectState>()(
       workflow: { nodes: [], edges: [] },
       generatedSQL: null,
       generatedFiles: [],
+      
+      // Wizard Init
+      wizardStep: 0,
+      wizardStatus: "Idle",
+      wizardLogs: [],
+
+      setWizardStep: (step) => set({ wizardStep: step }),
+      setWizardStatus: (status) => set({ wizardStatus: status }),
+      addWizardLog: (log) => set(state => ({ wizardLogs: [...state.wizardLogs, log] })),
+      clearWizardLogs: () => set({ wizardLogs: [] }),
 
       setInitializing: (status) => set({ isInitializing: status }),
       setProjectDetails: (name, repoUrl) => set({ projectName: name, repoUrl: repoUrl }),
@@ -158,7 +178,17 @@ export const useProjectStore = create<ProjectState>()(
     {
       name: 'superior-storage', // name of the item in the storage (must be unique)
       storage: createJSONStorage(() => localStorage), // (optional) by default, 'localStorage' is used
-      partialize: (state) => ({ projects: state.projects, activeProjectId: state.activeProjectId }), // Only persist projects and active ID
+      partialize: (state) => ({ 
+        projects: state.projects, 
+        activeProjectId: state.activeProjectId,
+        // Persist Wizard State
+        wizardStep: state.wizardStep,
+        wizardStatus: state.wizardStatus,
+        wizardLogs: state.wizardLogs,
+        isInitializing: state.isInitializing,
+        projectName: state.projectName,
+        autoBuildPrompt: state.autoBuildPrompt
+      }),
     }
   )
 );
