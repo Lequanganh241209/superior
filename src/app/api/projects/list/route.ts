@@ -21,11 +21,21 @@ export async function GET() {
       .from('projects')
       .select('*')
       .eq('user_id', user.id)
+      .neq('deployment_url', '') // Filter out empty deployment URLs
+      .not('deployment_url', 'is', null) // Filter out null deployment URLs
       .order('created_at', { ascending: false });
 
     if (dbProjects && dbProjects.length > 0) {
+        // Filter out projects that are known to be failed or have invalid URLs
+        const validProjects = dbProjects.filter(p => 
+            p.deployment_url && 
+            p.deployment_url.startsWith('http') && 
+            !p.deployment_url.includes('undefined')
+        );
+
         const healed: any[] = [];
-        for (const p of dbProjects) {
+        // Limit concurrency to avoid timeout
+        for (const p of validProjects.slice(0, 5)) { // Process only top 5 recent projects to reduce load
             let url = p.deployment_url || "";
             let ok = false;
             if (url) {
