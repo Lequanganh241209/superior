@@ -35,35 +35,12 @@ const healPreview = async (p: Project) => {
   return p.deployment_url;
 };
 
+import { ProjectInit } from "@/components/dashboard/ProjectInit";
+
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center space-y-8 bg-zinc-950">
-      <div className="relative">
-        <div className="absolute inset-0 bg-purple-500/20 blur-3xl rounded-full" />
-        <div className="relative w-32 h-32 bg-zinc-900 border border-white/10 rounded-3xl flex items-center justify-center shadow-2xl">
-            <Terminal className="w-16 h-16 text-purple-500" />
-        </div>
-      </div>
-      
-      <div className="max-w-md space-y-4">
-        <h2 className="text-3xl font-bold text-white tracking-tight">
-            Welcome to Aether Architect
-        </h2>
-        <p className="text-zinc-400">
-            Select an existing project from the sidebar or initialize a new neural architecture to begin.
-        </p>
-      </div>
-
-      <div className="flex gap-4">
-        <Button size="lg" onClick={onCreate} className="h-12 px-8 bg-white text-black hover:bg-zinc-200 rounded-full font-semibold gap-2">
-            <Plus className="w-5 h-5" />
-            Initialize Project
-        </Button>
-        <Button size="lg" variant="outline" className="h-12 px-8 border-zinc-800 text-zinc-300 hover:bg-zinc-900 rounded-full gap-2">
-            <FolderOpen className="w-5 h-5" />
-            Open Existing
-        </Button>
-      </div>
+        <ProjectInit />
     </div>
   );
 }

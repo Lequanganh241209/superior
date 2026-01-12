@@ -88,7 +88,7 @@ export async function GET() {
 
     // 2. If DB is empty, try to Sync from GitHub (Auto-Migration for Admin/Existing User)
     // Only do this if GITHUB_PAT is available (Admin/Owner context)
-    if (process.env.GITHUB_PAT) {
+    if (process.env.GITHUB_PAT && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         console.log("DB empty, attempting auto-sync from GitHub...");
         try {
             const octokit = new Octokit({ auth: process.env.GITHUB_PAT });
@@ -99,8 +99,8 @@ export async function GET() {
 
             const syncedProjects = [];
             const adminSupabase = createAdminClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!, 
-                process.env.SUPABASE_SERVICE_ROLE_KEY!
+                process.env.NEXT_PUBLIC_SUPABASE_URL, 
+                process.env.SUPABASE_SERVICE_ROLE_KEY
             );
 
             for (const repo of repos) {
