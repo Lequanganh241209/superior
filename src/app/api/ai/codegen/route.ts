@@ -429,8 +429,11 @@ const config = {
        - Only import from \`@/components/ui/...\` (e.g., button, card, input, badge, accordion, sheet, avatar).
        - DO NOT import from \`@/components/icons\` or other non-standard paths. Use \`lucide-react\` directly.
        
-    3. **DEFAULT EXPORTS**:
-       - EVERY file (especially page.tsx and components) MUST have an \`export default function ComponentName() {...}\`.
+    3. **DEFAULT EXPORTS (STRICT)**:
+       - EVERY component file (e.g., Navbar.tsx, Hero.tsx) **MUST** use \`export default function ComponentName() {...}\`.
+       - DO NOT use named exports (e.g., \`export const Navbar = ...\`) for main components. This causes "Element type is invalid" errors.
+       - Correct: \`export default function Navbar() { ... }\`
+       - Incorrect: \`export const Navbar = () => { ... }\`
        
     4. **NO RELATIVE IMPORTS OF MISSING FILES**:
        - If you didn't create it, don't import it.
