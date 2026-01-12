@@ -17,27 +17,12 @@ interface Project {
   status: string;
 }
 
-// ... existing overrides logic ...
-const OVERRIDES: Record<string, string> = {
-  writingtask2: "https://writingtask2-646deiwnu-le-quang-tons-projects.vercel.app"
-};
-const overrideFor = (p: Project) => {
-  if (!p) return null;
-  const key1 = (p.name || "").toLowerCase();
-  const repo = p.repo_name || "";
-  const tail = typeof repo === 'string' ? repo.split("/").pop() || "" : "";
-  const key2 = tail.toLowerCase();
-  return OVERRIDES[key1] || OVERRIDES[key2] || null;
-};
 const healPreview = async (p: Project) => {
-  const ov = overrideFor(p);
-  if (ov) return ov;
-  if ((p.deployment_url || "").toLowerCase().includes("writingtask2.vercel.app")) {
-    return OVERRIDES.writingtask2;
-  }
   try {
-    const head = await fetch(p.deployment_url, { method: "HEAD" });
-    if (head.ok) return p.deployment_url;
+    if (p.deployment_url) {
+        const head = await fetch(p.deployment_url, { method: "HEAD" });
+        if (head.ok) return p.deployment_url;
+    }
     const refetch = await fetch("/api/projects/list");
     if (refetch.ok) {
       const refreshed = await refetch.json();

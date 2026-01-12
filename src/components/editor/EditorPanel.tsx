@@ -118,7 +118,7 @@ export function EditorPanel() {
         createProject(name, userMsg);
     }
 
-    // FAKE THINKING PROCESS (To mimic Lovable)
+    // THINKING PROCESS (To mimic Lovable)
     setMessages(prev => [...prev, { role: "assistant", content: "🔍 Analyzing your request..." }]);
     await new Promise(r => setTimeout(r, 800));
     setMessages(prev => {

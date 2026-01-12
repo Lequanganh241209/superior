@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Sparkles, Zap, Shield, Cpu, Code2, Globe, Database, Terminal, ChevronRight, Activity, Box } from "lucide-react";
+import { ArrowRight, Sparkles, Zap, Shield, Cpu, Code2, Globe, Database, Terminal, ChevronRight, Activity, Box, Triangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -42,9 +42,11 @@ function Hero() {
                   </span>
                 </Button>
               </Link>
-              <Link href="#demo">
-                <Button variant="outline" className="h-14 px-8 border-zinc-800 text-zinc-300 hover:bg-zinc-900/50 hover:text-white hover:border-cyan-500/50 font-mono rounded-none skew-x-[-10deg]">
-                  <span className="skew-x-[10deg]">VIEW_BLUEPRINT</span>
+              <Link href="https://vercel.com/new/clone?repository-url=https://github.com/tonlq/superior" target="_blank">
+                <Button variant="outline" className="h-14 px-8 border-zinc-800 text-zinc-300 hover:bg-white hover:text-black hover:border-white font-mono rounded-none skew-x-[-10deg] transition-all">
+                  <span className="skew-x-[10deg] flex items-center">
+                    <Triangle className="w-4 h-4 mr-2 fill-current" /> DEPLOY TO VERCEL
+                  </span>
                 </Button>
               </Link>
             </div>
@@ -170,6 +172,78 @@ function Stats() {
   );
 }
 
+function ComparisonSection() {
+  const points = [
+    {
+      metric: "CORE_PHILOSOPHY",
+      standard: "UI Generator (Frontend Only)",
+      aether: "Autonomous Architect (Full Stack)",
+    },
+    {
+      metric: "ERROR_HANDLING",
+      standard: "Manual Fix Required",
+      aether: "Self-Healing Runtimes",
+    },
+    {
+      metric: "DATABASE",
+      standard: "Mock / Simple Integration",
+      aether: "PostgreSQL Schema Engineering",
+    },
+    {
+      metric: "DEPLOYMENT",
+      standard: "Proprietary Hosting",
+      aether: "Zero Lock-in (Vercel/Supabase)",
+    },
+    {
+      metric: "EVOLUTION",
+      standard: "Static Generation",
+      aether: "Continuous Self-Improvement",
+    },
+  ];
+
+  return (
+    <section className="py-32 bg-[#050505]">
+      <div className="container px-4 md:px-6">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">
+            SUPERIORITY <span className="text-cyan-500">INDEX</span>
+          </h2>
+          <p className="text-zinc-400">Benchmark against standard market solutions.</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mb-6 text-xs font-mono tracking-widest text-zinc-500 px-6">
+          <div>METRIC</div>
+          <div>STANDARD_AI</div>
+          <div className="text-cyan-500">AETHER_OS</div>
+        </div>
+
+        <div className="space-y-4">
+          {points.map((p, i) => (
+            <div
+              key={i}
+              className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-colors items-center overflow-hidden"
+            >
+              <div className="font-mono text-xs text-zinc-500">{p.metric}</div>
+              <div className="text-zinc-400 text-sm">{p.standard}</div>
+              <div className="text-cyan-400 font-bold text-sm flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse" />
+                {p.aether}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-12 p-8 border border-cyan-500/20 bg-cyan-950/10 rounded-lg text-center">
+          <h3 className="text-2xl font-bold text-white mb-2">CONCLUSION</h3>
+          <p className="text-cyan-400 font-mono">
+            AETHER_OS OUTPERFORMS STANDARD MODELS BY <span className="text-white text-lg">10X</span> IN ARCHITECTURAL COMPLEXITY.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CTA() {
   return (
     <section className="py-32 bg-[#050505] relative overflow-hidden">
@@ -198,19 +272,59 @@ function CTA() {
 
 function Footer() {
   return (
-    <footer className="py-12 bg-black border-t border-white/10 text-sm font-mono">
-      <div className="container px-4 md:px-6">
-        <div className="flex flex-col md:flex-row justify-between items-center text-zinc-600">
-          <div className="flex items-center space-x-2 mb-4 md:mb-0">
-            <div className="w-3 h-3 bg-cyan-900 flex items-center justify-center">
-                <div className="w-1.5 h-1.5 bg-cyan-500" />
+    <footer className="py-20 bg-black border-t border-white/10 text-sm font-mono relative overflow-hidden">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[1px] bg-gradient-to-r from-transparent via-cyan-900/50 to-transparent" />
+      
+      <div className="container px-4 md:px-6 relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-cyan-900 flex items-center justify-center">
+                  <div className="w-2 h-2 bg-cyan-500" />
+              </div>
+              <span className="font-bold tracking-widest text-white">AETHER_OS</span>
             </div>
-            <span>AETHER_OS © 2024</span>
+            <p className="text-zinc-500 text-xs leading-relaxed max-w-xs">
+              Autonomous neural architecture for the next generation of digital experiences. 
+              System status: <span className="text-green-500">OPERATIONAL</span>
+            </p>
           </div>
-          <div className="flex space-x-8">
-            <span className="hover:text-cyan-500 cursor-pointer transition-colors">PROTOCOL</span>
-            <span className="hover:text-cyan-500 cursor-pointer transition-colors">LEGAL</span>
-            <span className="hover:text-cyan-500 cursor-pointer transition-colors">STATUS</span>
+          
+          <div>
+            <h3 className="font-bold text-white mb-6 tracking-wider text-xs">PRODUCT</h3>
+            <ul className="space-y-3 text-zinc-500">
+              <li><Link href="/dashboard" className="hover:text-cyan-400 transition-colors">Neural Engine</Link></li>
+              <li><Link href="/dashboard" className="hover:text-cyan-400 transition-colors">Self-Healing</Link></li>
+              <li><Link href="/dashboard" className="hover:text-cyan-400 transition-colors">Deployment</Link></li>
+              <li><span className="text-zinc-700 cursor-not-allowed" title="Coming Q4 2024">Enterprise API</span></li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-white mb-6 tracking-wider text-xs">RESOURCES</h3>
+            <ul className="space-y-3 text-zinc-500">
+              <li><Link href="https://github.com/tonlq/superior" target="_blank" className="hover:text-cyan-400 transition-colors">Documentation</Link></li>
+              <li><Link href="https://github.com/tonlq/superior" target="_blank" className="hover:text-cyan-400 transition-colors">Source Code</Link></li>
+              <li><span className="text-zinc-700 cursor-not-allowed">Community Forum</span></li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-white mb-6 tracking-wider text-xs">LEGAL</h3>
+            <ul className="space-y-3 text-zinc-500">
+              <li><span className="hover:text-cyan-400 cursor-pointer transition-colors">Privacy Protocol</span></li>
+              <li><span className="hover:text-cyan-400 cursor-pointer transition-colors">Terms of Service</span></li>
+              <li><span className="hover:text-cyan-400 cursor-pointer transition-colors">Cookie Policy</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center text-zinc-600 text-xs">
+          <span>© 2024 AETHER_OS SYSTEM. ALL RIGHTS RESERVED.</span>
+          <div className="flex space-x-6 mt-4 md:mt-0">
+             <span className="hover:text-white cursor-pointer">TWITTER</span>
+             <span className="hover:text-white cursor-pointer">GITHUB</span>
+             <span className="hover:text-white cursor-pointer">DISCORD</span>
           </div>
         </div>
       </div>
@@ -245,6 +359,7 @@ export default function LandingPage() {
         <Hero />
         <Stats />
         <Features />
+        <ComparisonSection />
         <CTA />
       </main>
 
