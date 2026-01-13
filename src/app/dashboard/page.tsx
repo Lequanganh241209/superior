@@ -4,14 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useProjectStore } from "@/store/project-store";
-import { Plus, Terminal, Sparkles, FolderOpen, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/dashboard/SkeletonLoader";
 import dynamic from "next/dynamic";
 
-// Dynamic Imports to prevent Circular Dependency / ReferenceError ('C' initialization)
-const ProjectInit = dynamic(
-  () => import("@/components/dashboard/ProjectInit").then((mod) => mod.ProjectInit),
+// Dynamic Imports with explicit loading states to prevent hydration mismatches and TDZ errors
+const EmptyState = dynamic(
+  () => import("@/components/dashboard/EmptyState").then((mod) => mod.EmptyState),
   { ssr: false, loading: () => <DashboardSkeleton /> }
 );
 
@@ -45,15 +43,6 @@ const healPreview = async (p: Project) => {
   } catch {}
   return p.deployment_url;
 };
-
-// Define EmptyState component outside to avoid re-creation
-function EmptyState() {
-  return (
-    <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center space-y-8 bg-zinc-950">
-        <ProjectInit />
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
