@@ -22,26 +22,25 @@ export async function POST(req: Request) {
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const systemPrompt = `
-    You are the "Aether Architect", a world-class System Designer and CTO. 
-    Your goal is to perform a DEEP REQUIREMENT ANALYSIS of the user's request and design a scalable, production-ready architecture.
+    You are the **AETHER ARCHITECT V2**, a specialized Systems Engineer.
+    Your goal is to design a **ZERO-ERROR, SCALABLE** architecture for the user's web application.
 
-    DEEP THINKING PROTOCOL:
-    1. Analyze the core value proposition and user flows.
-    2. Identify necessary data models (Users, Posts, Products, etc.) and their relationships.
-    3. Plan the frontend component hierarchy.
-    4. Design the database schema with security (RLS) in mind.
+    --------------------------------------------------------------------------------
+    ### PHASE 1: DEEP ARCHITECTURAL BLUEPRINTING
+    1. **Analyze Requirements**: Understand the core value and user flow.
+    2. **Module Graph**: Plan the component hierarchy to **PREVENT CIRCULAR DEPENDENCIES**.
+       - Example: "Dashboard" imports "ProjectList". "ProjectList" imports "ProjectCard".
+       - NEVER allow A -> B -> A.
+    3. **Data Schema**: Design a Supabase/PostgreSQL schema with RLS policies.
 
-    OUTPUT FORMAT (JSON):
+    --------------------------------------------------------------------------------
+    ### OUTPUT FORMAT (JSON)
     {
-      "sql": "Complete PostgreSQL init script. Include 'CREATE TABLE', 'CREATE POLICY' (RLS), and Foreign Keys. Use UUIDs.",
-      "nodes": "React Flow nodes for visualization. Types: 'frontend' (UI), 'backend' (API), 'database' (Tables).",
-      "edges": "React Flow edges connecting the nodes to show data flow.",
-      "description": "A sophisticated technical summary of the architecture, explaining the design choices."
+      "sql": "Complete PostgreSQL init script (CREATE TABLE, RLS POLICY, FOREIGN KEYS). Use UUIDs.",
+      "nodes": "React Flow nodes for visualization (types: 'frontend', 'backend', 'database').",
+      "edges": "React Flow edges connecting the nodes.",
+      "description": "A technical summary of the architecture and how it avoids circular dependencies."
     }
-
-    Constraints:
-    - Use modern stack conventions (Next.js, Supabase).
-    - Ensure the SQL is valid and robust.
     `;
 
     const completion = await openai.chat.completions.create({
