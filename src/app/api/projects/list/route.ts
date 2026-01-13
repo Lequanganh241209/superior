@@ -24,6 +24,12 @@ export async function GET() {
       .neq('deployment_url', '') // Filter out empty deployment URLs
       .not('deployment_url', 'is', null) // Filter out null deployment URLs
       .order('created_at', { ascending: false });
+    
+    if (error) {
+        console.error("DB Fetch Error:", error);
+        // Fallback to empty list instead of crashing
+        return NextResponse.json({ projects: [] });
+    }
 
     if (dbProjects && dbProjects.length > 0) {
         // Filter out projects that are known to be failed or have invalid URLs

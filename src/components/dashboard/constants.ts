@@ -1,3 +1,5 @@
+"use client";
+
 export const BuildSteps = [
   { id: 1, label: 'Requirement Analysis', duration: 2000 },
   { id: 2, label: 'Dependency Mapping', duration: 1500 },
