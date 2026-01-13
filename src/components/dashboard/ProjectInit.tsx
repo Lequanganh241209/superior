@@ -825,7 +825,7 @@ export default function Page() {
                             <div className="text-green-500 animate-pulse pl-4">_</div>
                         )}
                     </div>
-                </motion.div>
+                </div>
             )}
         </div>
       </div>
