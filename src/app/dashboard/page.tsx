@@ -113,5 +113,5 @@ export default function Dashboard() {
   }
 
   // Render the new Split View Editor
-  return <SplitView />;
+  return <SplitView key={projectName} />;
 }
