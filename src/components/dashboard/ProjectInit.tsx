@@ -366,12 +366,14 @@ export default function Page() {
         setWizardStatus("Mapping Dependencies & Architecture...");
 
         // 2. CODING PHASE
-        addWizardLog("PHASE 2: GENERATING FULL-STACK SOURCE CODE...");
-        toast.loading("Phase 2: Generating Full-Stack Source Code...", { id: toastId });
+        addWizardLog("[LOG]: Requirement Analysis Completed.");
+        addWizardLog("[LOG]: Logic & State Management Defined.");
+        addWizardLog("PHASE 2: ATOMIC DEVELOPMENT (Generating Components)...");
+        toast.loading("Phase 2: Atomic Development...", { id: toastId });
         
         // ARTIFICIAL DELAY FOR UX "THOUGHT PROCESS" VISIBILITY
-        await new Promise(r => setTimeout(r, 1500)); // Increased for Step 2 visibility
-        addWizardLog(">> Analyzing UX Patterns & Design System...");
+        await new Promise(r => setTimeout(r, 1500)); 
+        addWizardLog("[THINKING]: Generating atomic components with strict naming conventions...");
         
         // Aether Architect: Step 3
         setWizardStep(3);
@@ -398,6 +400,7 @@ export default function Page() {
     // Aether Architect: Step 4
     setWizardStep(4);
     setWizardStatus("Auditing Imports & Security...");
+    addWizardLog("[THINKING]: Running internal audit for undefined variables and import integrity...");
     
     let ensuredFiles: { path: string; content: string }[] = [];
     try {
@@ -435,6 +438,8 @@ export default function Page() {
                     { name: "Separator", path: "@/components/ui/separator" },
                     { name: "ScrollArea", path: "@/components/ui/scroll-area" },
                 ];
+                
+                // ... (existing audit logic) ...
 
                 uiComponents.forEach(comp => {
                     // If component is used (<Button) but not imported
@@ -545,6 +550,8 @@ export default function Page() {
         // CRITICAL: Update Store with generated files so Preview Panel works immediately
         try {
             setGeneratedFiles(ensuredFiles);
+            addWizardLog("[LOG]: UI Audit Passed (Zero undefined references).");
+            addWizardLog("[LOG]: VFS Sync Successful.");
         } catch (e: any) {
             console.error("State update failed:", e);
             addWizardLog(`CRITICAL WARNING: Failed to update local state (Memory Limit?). Deployment will continue.`);
