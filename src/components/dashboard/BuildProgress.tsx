@@ -1,7 +1,6 @@
 "use client";
 
 import React from 'react';
-import { motion } from 'framer-motion';
 import { CheckCircle2, Circle, Loader2, Cpu } from 'lucide-react';
 
 const BuildSteps = [
@@ -39,12 +38,10 @@ export function BuildProgress({ currentStep, status }: BuildProgressProps) {
           return (
             <div key={step.id} className="flex-1 space-y-2 group">
               <div className="relative h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden">
-                <motion.div 
-                    initial={{ width: "0%" }}
-                    animate={{ width: isCompleted ? "100%" : isActive ? "100%" : "0%" }}
-                    transition={{ 
-                        duration: isCompleted ? 0.5 : step.duration / 1000, 
-                        ease: "linear" 
+                <div 
+                    style={{ 
+                        width: isCompleted ? "100%" : isActive ? "100%" : "0%",
+                        transition: `width ${isCompleted ? 0.5 : step.duration / 1000}s linear`
                     }}
                     className={`absolute top-0 left-0 h-full rounded-full ${
                         isCompleted ? 'bg-green-500' : 'bg-purple-500 shadow-[0_0_15px_#a855f7]'
@@ -58,13 +55,13 @@ export function BuildProgress({ currentStep, status }: BuildProgressProps) {
                     {step.label}
                 </p>
                 {(isActive || isCompleted) && (
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                    <div className="transition-transform duration-300 scale-100">
                         {isCompleted ? (
                             <CheckCircle2 className="w-3 h-3 text-green-500" />
                         ) : (
                             <Circle className="w-3 h-3 text-purple-500 fill-purple-500/20 animate-pulse" />
                         )}
-                    </motion.div>
+                    </div>
                 )}
               </div>
             </div>

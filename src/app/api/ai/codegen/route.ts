@@ -401,6 +401,8 @@ const config = {
     - **Interactive & Alive**: Use \`framer-motion\` for EVERY section. Elements should fade in, slide up, or scale upon scrolling. Buttons should have hover states.
     - **Mobile Perfection**: Everything must stack beautifully on mobile (\`grid-cols-1\`) and expand on desktop (\`md:grid-cols-3\`).
     - **Typography**: Use \`tracking-tight\` for Headings to give a premium feel. Use \`leading-relaxed\` for body text.
+    - **Visual Hierarchy**: Use a mix of font weights (Light, Normal, Semibold, Bold) to create depth.
+    - **Color Palette**: Use a sophisticated, limited color palette. Avoid default primary blue unless requested. Use slate/zinc/neutral for text.
     
     --------------------------------------------------------------------------------
     ### 2. ANTI-LAZINESS PROTOCOL (CRITICAL)
@@ -412,6 +414,7 @@ const config = {
        - Do not build simple "Hello World" components. 
        - Add **Tooltips**, **Hover Effects**, **Badges**, **Sub-descriptions**, and **Icons** to everything.
        - Use **Gradients**, **Blur Effects** (\`backdrop-blur-md\`), and **Borders** to add depth.
+       - **Images**: Use \`mini-svg-data-uri\` patterns or high-quality Unsplash images for backgrounds.
     4. **TEXT VOLUME**: Write long, engaging marketing copy. 
        - Headings should have subheadings. 
        - Features should have detailed descriptions.

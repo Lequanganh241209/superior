@@ -58,37 +58,43 @@ export async function GET() {
                         headers: { Authorization: `Bearer ${process.env.VERCEL_ACCESS_TOKEN}` }
                     });
                     if (projRes.ok) {
-                        const proj = await projRes.json();
-                        const depRes = await fetch(`https://api.vercel.com/v13/deployments?projectId=${proj.id}&limit=1`, {
-                            headers: { Authorization: `Bearer ${process.env.VERCEL_ACCESS_TOKEN}` }
-                        });
-                        if (depRes.ok) {
-                            const dep = await depRes.json();
-                            const first = dep.deployments?.[0];
-                            const resolved = first?.url ? `https://${first.url}` : (first?.alias?.[0] ? `https://${first.alias[0]}` : "");
-                            if (resolved) {
-                                // Try to bind canonical alias <project>.vercel.app to latest deployment (best-effort)
-                                try {
-                                    const deploymentId = first?.uid || first?.id;
-                                    if (deploymentId) {
-                                        await fetch(`https://api.vercel.com/v13/deployments/${deploymentId}/aliases`, {
-                                            method: "POST",
-                                            headers: { 
-                                                Authorization: `Bearer ${process.env.VERCEL_ACCESS_TOKEN}`,
-                                                "Content-Type": "application/json"
-                                            },
-                                            body: JSON.stringify({ alias: `${proj.name}.vercel.app` })
-                                        });
-                                    }
-                                } catch {}
-                                url = resolved;
-                                await supabase.from('projects')
-                                    .update({ deployment_url: url })
-                                    .eq('id', p.id);
+                        const proj = await projRes.json().catch(() => null);
+                        if (proj && proj.id) {
+                            const depRes = await fetch(`https://api.vercel.com/v13/deployments?projectId=${proj.id}&limit=1`, {
+                                headers: { Authorization: `Bearer ${process.env.VERCEL_ACCESS_TOKEN}` }
+                            });
+                            if (depRes.ok) {
+                                const dep = await depRes.json().catch(() => null);
+                                const first = dep?.deployments?.[0];
+                                const resolved = first?.url ? `https://${first.url}` : (first?.alias?.[0] ? `https://${first.alias[0]}` : "");
+                                if (resolved) {
+                                    // Try to bind canonical alias <project>.vercel.app to latest deployment (best-effort)
+                                    try {
+                                        const deploymentId = first?.uid || first?.id;
+                                        if (deploymentId) {
+                                            await fetch(`https://api.vercel.com/v13/deployments/${deploymentId}/aliases`, {
+                                                method: "POST",
+                                                headers: { 
+                                                    Authorization: `Bearer ${process.env.VERCEL_ACCESS_TOKEN}`,
+                                                    "Content-Type": "application/json"
+                                                },
+                                                body: JSON.stringify({ alias: `${proj.name}.vercel.app` })
+                                            }).catch(() => {});
+                                        }
+                                    } catch {}
+                                    url = resolved;
+                                    await supabase.from('projects')
+                                        .update({ deployment_url: url })
+                                        .eq('id', p.id)
+                                        .catch(() => {});
+                                }
                             }
                         }
                     }
-                } catch {}
+                } catch (vercelError) {
+                    console.error("Vercel Sync Error:", vercelError);
+                    // Ignore Vercel errors to prevent API crash
+                }
             }
             healed.push({
                 id: p.id,

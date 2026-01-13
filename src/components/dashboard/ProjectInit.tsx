@@ -804,10 +804,8 @@ export default function Page() {
 
             {/* Live Logs Terminal */}
             {wizardLogs.length > 0 && (
-                <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="mt-6 p-4 bg-black border border-green-500/20 rounded-lg font-mono text-xs max-h-60 overflow-y-auto shadow-inner custom-scrollbar"
+                <div 
+                    className="mt-6 p-4 bg-black border border-green-500/20 rounded-lg font-mono text-xs max-h-60 overflow-y-auto shadow-inner custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300"
                 >
                     <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
                         <span className="text-green-500/50 uppercase tracking-widest text-[10px] font-bold">System Logs</span>
