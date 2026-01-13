@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
-import { BuildProgress, BuildSteps } from "./BuildProgress";
+import { BuildProgress } from "./BuildProgress";
+import { BuildSteps } from "./constants";
 
 export function ProjectInit() {
   const { 
