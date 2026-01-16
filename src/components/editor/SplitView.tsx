@@ -216,7 +216,7 @@ export function SplitView() {
                         device === "desktop" && "w-full h-full border-none rounded-none shadow-none"
                     )}
                 >
-                    <PreviewPanel />
+                    <PreviewPanel files={generatedFiles} />
                 </div>
             </div>
         </ResizablePanel>

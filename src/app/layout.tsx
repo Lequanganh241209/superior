@@ -43,7 +43,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={cn(inter.className, "min-h-screen bg-background antialiased selection:bg-cyan-500/30 selection:text-cyan-200")}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Electrolize&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+      </head>
+      <body className={cn("min-h-screen bg-background antialiased selection:bg-cyan-500/30 selection:text-cyan-200")}>
         <GlobalErrorSuppressor />
         {children}
         <Analytics />

@@ -21,96 +21,28 @@ export async function GET() {
       .from('projects')
       .select('*')
       .eq('user_id', user.id)
-      .neq('deployment_url', '') // Filter out empty deployment URLs
-      .not('deployment_url', 'is', null) // Filter out null deployment URLs
       .order('created_at', { ascending: false });
-    
-    if (error) {
-        console.error("DB Fetch Error:", error);
-        // Fallback to empty list instead of crashing
-        return NextResponse.json({ projects: [] });
-    }
 
     if (dbProjects && dbProjects.length > 0) {
-        // Filter out projects that are known to be failed or have invalid URLs
-        const validProjects = dbProjects.filter(p => 
-            p.deployment_url && 
-            p.deployment_url.startsWith('http') && 
-            !p.deployment_url.includes('undefined')
-        );
-
-        const healed: any[] = [];
-        // Limit concurrency to avoid timeout
-        for (const p of validProjects.slice(0, 5)) { // Process only top 5 recent projects to reduce load
-            let url = p.deployment_url || "";
-            let ok = false;
-            if (url) {
-                try {
-                    const res = await fetch(url, { method: "HEAD" });
-                    ok = res.ok;
-                } catch {}
-            }
-            if (!ok && process.env.VERCEL_ACCESS_TOKEN) {
-                try {
-                    const projName = (p.name || "").toLowerCase().replace(/\s+/g, "-");
-                    // Query Vercel directly for latest deployment
-                    const projRes = await fetch(`https://api.vercel.com/v9/projects/${projName}`, {
-                        headers: { Authorization: `Bearer ${process.env.VERCEL_ACCESS_TOKEN}` }
-                    });
-                    if (projRes.ok) {
-                        const proj = await projRes.json().catch(() => null);
-                        if (proj && proj.id) {
-                            const depRes = await fetch(`https://api.vercel.com/v13/deployments?projectId=${proj.id}&limit=1`, {
-                                headers: { Authorization: `Bearer ${process.env.VERCEL_ACCESS_TOKEN}` }
-                            });
-                            if (depRes.ok) {
-                                const dep = await depRes.json().catch(() => null);
-                                const first = dep?.deployments?.[0];
-                                const resolved = first?.url ? `https://${first.url}` : (first?.alias?.[0] ? `https://${first.alias[0]}` : "");
-                                if (resolved) {
-                                    // Try to bind canonical alias <project>.vercel.app to latest deployment (best-effort)
-                                    try {
-                                        const deploymentId = first?.uid || first?.id;
-                                        if (deploymentId) {
-                                            await fetch(`https://api.vercel.com/v13/deployments/${deploymentId}/aliases`, {
-                                                method: "POST",
-                                                headers: { 
-                                                    Authorization: `Bearer ${process.env.VERCEL_ACCESS_TOKEN}`,
-                                                    "Content-Type": "application/json"
-                                                },
-                                                body: JSON.stringify({ alias: `${proj.name}.vercel.app` })
-                                            }).catch(() => {});
-                                        }
-                                    } catch {}
-                                    url = resolved;
-                                    await supabase.from('projects')
-                                        .update({ deployment_url: url })
-                                        .eq('id', p.id)
-                                        .catch(() => {});
-                                }
-                            }
-                        }
-                    }
-                } catch (vercelError) {
-                    console.error("Vercel Sync Error:", vercelError);
-                    // Ignore Vercel errors to prevent API crash
-                }
-            }
-            healed.push({
+        // PERFORMANCE OPTIMIZATION: Removed aggressive Vercel/URL checking loop.
+        // This was causing N+1 API calls and significant latency.
+        // TODO: Move "healing" logic to a separate background job or specific "refresh status" endpoint.
+        
+        return NextResponse.json({ 
+            projects: dbProjects.map(p => ({
                 id: p.id,
                 name: p.name,
                 repo_name: p.repo_name,
-                deployment_url: url,
+                deployment_url: p.deployment_url || "",
                 status: p.status || "active",
                 created_at: p.created_at
-            });
-        }
-        return NextResponse.json({ projects: healed });
+            }))
+        });
     }
 
     // 2. If DB is empty, try to Sync from GitHub (Auto-Migration for Admin/Existing User)
     // Only do this if GITHUB_PAT is available (Admin/Owner context)
-    if (process.env.GITHUB_PAT && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    if (process.env.GITHUB_PAT) {
         console.log("DB empty, attempting auto-sync from GitHub...");
         try {
             const octokit = new Octokit({ auth: process.env.GITHUB_PAT });
@@ -121,8 +53,8 @@ export async function GET() {
 
             const syncedProjects = [];
             const adminSupabase = createAdminClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL, 
-                process.env.SUPABASE_SERVICE_ROLE_KEY
+                process.env.NEXT_PUBLIC_SUPABASE_URL!, 
+                process.env.SUPABASE_SERVICE_ROLE_KEY!
             );
 
             for (const repo of repos) {
@@ -184,8 +116,7 @@ export async function GET() {
     return NextResponse.json({ projects: [] });
 
   } catch (error: any) {
-    console.error("Projects List Error (Handled):", error);
-    // CRITICAL FIX: Return empty list instead of 500 to prevent Frontend Crash
-    return NextResponse.json({ projects: [] }); 
+    console.error("Projects List Error:", error);
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }

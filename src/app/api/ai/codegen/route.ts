@@ -1,579 +1,115 @@
-import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
-import { jsonrepair } from 'jsonrepair';
 
-export const maxDuration = 300;
+import { NextRequest, NextResponse } from 'next/server';
+import { SuperiorCodeGenerator } from '@/lib/ai/code-generator';
+import { ValidationEngine } from '@/lib/ai/validator';
+import { z } from 'zod';
 
-export async function POST(req: Request) {
-  console.log("[CODEGEN] Received request");
+export const maxDuration = 300; // 5 minutes (Vercel Hobby Limit is 10s, Pro is 300s. We set 300s to match Pro)
+// Note: If self-hosting, this can be increased further. 
+// Ideally we want 360s (6 mins) but Vercel limits might cap at 300s for Serverless Functions.
+// For longer tasks, we should use Edge Functions or Background Jobs, but for now 300s is a good upgrade from default.
 
-  // DEFINITIONS
-  const CONFIG_FILES = [
-        {
-             path: "package.json",
-             content: JSON.stringify({
-               "name": "superior-app",
-               "version": "0.1.0",
-               "private": true,
-               "scripts": {
-                 "dev": "next dev",
-                 "build": "next build",
-                 "start": "next start",
-                 "lint": "next lint"
-               },
-               "dependencies": {
-                 "react": "^18",
-                 "react-dom": "^18",
-                 "next": "14.1.0",
-                 "lucide-react": "^0.344.0",
-                 "clsx": "^2.1.0",
-                 "tailwind-merge": "^2.2.1",
-                 "tailwindcss-animate": "^1.0.7",
-                 "class-variance-authority": "^0.7.0",
-                 "@radix-ui/react-slot": "^1.0.2",
-                 "@radix-ui/react-label": "^2.0.2",
-                 "@radix-ui/react-accordion": "^1.0.1",
-                 "@radix-ui/react-scroll-area": "^1.0.5",
-                 "@radix-ui/react-dialog": "^1.0.5",
-                 "@radix-ui/react-dropdown-menu": "^2.0.6",
-                 "@radix-ui/react-tabs": "^1.0.4",
-                 "@radix-ui/react-avatar": "^1.0.4",
-                 "@radix-ui/react-switch": "^1.0.3",
-                 "@radix-ui/react-popover": "^1.0.7",
-                 "framer-motion": "^11.0.8",
-                 "mini-svg-data-uri": "^1.4.4",
-                 "recharts": "^2.12.0",
-                 "date-fns": "^3.3.1"
-              },
-               "devDependencies": {
-                 "@types/node": "^20",
-                 "@types/react": "^18",
-                 "@types/react-dom": "^18",
-                 "autoprefixer": "^10.0.1",
-                 "postcss": "^8",
-                 "tailwindcss": "^3.3.0",
-                 "typescript": "^5"
-               }
-             }, null, 2)
-        },
-        {
-             path: "tsconfig.json",
-             content: JSON.stringify({
-               "compilerOptions": {
-                 "lib": ["dom", "dom.iterable", "esnext"],
-                 "allowJs": true,
-                 "skipLibCheck": true,
-                 "strict": true,
-                 "noEmit": true,
-                 "esModuleInterop": true,
-                 "module": "esnext",
-                 "moduleResolution": "bundler",
-                 "resolveJsonModule": true,
-                 "isolatedModules": true,
-                 "jsx": "preserve",
-                 "incremental": true,
-                 "baseUrl": ".",
-                 "plugins": [{ "name": "next" }],
-                 "paths": { "@/*": ["./src/*"] }
-               },
-               "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-               "exclude": ["node_modules"]
-             }, null, 2)
-        },
-        {
-             path: "next.config.mjs",
-             content: `/** @type {import('next').NextConfig} */
-const nextConfig = {
-  // output: 'export', // DISABLED FOR VERCEL
-  images: { unoptimized: true },
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
-};
-export default nextConfig;`
-        },
-        {
-             path: "postcss.config.js",
-             content: "module.exports = { plugins: { tailwindcss: {}, autoprefixer: {}, }, }"
-        },
-        {
-             path: "src/lib/utils.ts",
-             content: `import { type ClassValue, clsx } from "clsx"; import { twMerge } from "tailwind-merge"; export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }`
-        },
-        {
-             path: "src/app/layout.tsx",
-             content: `import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
-import "./globals.css";
-import { cn } from "@/lib/utils";
+const requestSchema = z.object({
+  prompt: z.string().min(1, "Prompt is required"),
+  options: z.object({
+    framework: z.enum(['react', 'next', 'vue', 'svelte']).optional(),
+    styling: z.enum(['tailwind', 'css', 'styled-components']).optional(),
+    features: z.array(z.string()).optional()
+  }).optional()
+});
 
-const fontHeading = Outfit({ subsets: ["latin"], variable: "--font-heading", weight: ['400', '700'] });
-const fontBody = Inter({ subsets: ["latin"], variable: "--font-body" });
+export async function POST(req: NextRequest) {
+  const json = await req.json();
+  const validation = requestSchema.safeParse(json);
 
-export const metadata: Metadata = {
-  title: "Lovable Project",
-  description: "Generated by Superior AI",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <body className={cn(
-        "min-h-screen bg-background font-body antialiased",
-        fontHeading.variable,
-        fontBody.variable
-      )}>
-        {children}
-      </body>
-    </html>
-  );
-}
-`
-        },
-        {
-             path: "tailwind.config.ts",
-             content: `import type { Config } from "tailwindcss"
-const config = {
-  darkMode: ["class"],
-  content: ['./pages/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './app/**/*.{ts,tsx}', './src/**/*.{ts,tsx}'],
-  prefix: "",
-  theme: {
-    container: { center: true, padding: "2rem", screens: { "2xl": "1400px" } },
-    extend: {
-      fontFamily: {
-        heading: ['var(--font-heading)', 'sans-serif'],
-        body: ['var(--font-body)', 'sans-serif'],
-      },
-      colors: {
-        border: "hsl(var(--border))", input: "hsl(var(--input))", ring: "hsl(var(--ring))", background: "hsl(var(--background))", foreground: "hsl(var(--foreground))",
-        primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
-        secondary: { DEFAULT: "hsl(var(--secondary))", foreground: "hsl(var(--secondary-foreground))" },
-        destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
-        muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
-        accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
-        popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
-        card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
-      },
-      borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
-      keyframes: {
-        "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
-        "accordion-up": { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } },
-        "fade-in": { "0%": { opacity: "0", transform: "translateY(10px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
-        "fade-out": { "0%": { opacity: "1", transform: "translateY(0)" }, "100%": { opacity: "0", transform: "translateY(10px)" } },
-        "scale-in": { "0%": { transform: "scale(0.95)", opacity: "0" }, "100%": { transform: "scale(1)", opacity: "1" } },
-        "float": { "0%, 100%": { transform: "translateY(0)" }, "50%": { transform: "translateY(-10px)" } },
-        "shimmer": { "0%": { backgroundPosition: "-200% 0" }, "100%": { backgroundPosition: "200% 0" } }
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in": "fade-in 0.5s ease-out forwards",
-        "fade-out": "fade-out 0.5s ease-out forwards",
-        "scale-in": "scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-        "float": "float 3s ease-in-out infinite",
-        "shimmer": "shimmer 2s linear infinite",
-      },
-    },
-  },
-  plugins: [require("tailwindcss-animate")],
-} satisfies Config; export default config;`
-        },
-        {
-             path: "src/app/globals.css",
-             content: `@tailwind base; @tailwind components; @tailwind utilities;
-@layer base {
-  :root { 
-    --background: 210 40% 98%; 
-    --foreground: 222 47% 11%; 
-    --card: 0 0% 100%; 
-    --card-foreground: 222 47% 11%; 
-    --popover: 0 0% 100%; 
-    --popover-foreground: 222 47% 11%; 
-    --primary: 221 83% 53%; 
-    --primary-foreground: 210 40% 98%; 
-    --secondary: 210 40% 96.1%; 
-    --secondary-foreground: 222 47% 11%; 
-    --muted: 210 40% 96.1%; 
-    --muted-foreground: 215 16% 47%; 
-    --accent: 210 40% 96.1%; 
-    --accent-foreground: 222 47% 11%; 
-    --destructive: 0 84.2% 60.2%; 
-    --destructive-foreground: 210 40% 98%; 
-    --border: 214 32% 91%; 
-    --input: 214 32% 91%; 
-    --ring: 221 83% 53%; 
-    --radius: 0.75rem; 
+  if (!validation.success) {
+    return NextResponse.json({ 
+      status: 'error', 
+      message: 'Invalid request', 
+      errors: validation.error.flatten() 
+    }, { status: 400 });
   }
-  .dark { 
-    --background: 222 47% 11%; 
-    --foreground: 210 40% 98%; 
-    --card: 217 33% 17%; 
-    --card-foreground: 210 40% 98%; 
-    --popover: 222 47% 11%; 
-    --popover-foreground: 210 40% 98%; 
-    --primary: 217 91% 60%; 
-    --primary-foreground: 222 47% 11%; 
-    --secondary: 217 33% 17%; 
-    --secondary-foreground: 210 40% 98%; 
-    --muted: 217 33% 17%; 
-    --muted-foreground: 215 20% 65%; 
-    --accent: 217 33% 17%; 
-    --accent-foreground: 210 40% 98%; 
-    --destructive: 0 62.8% 30.6%; 
-    --destructive-foreground: 210 40% 98%; 
-    --border: 217 33% 17%; 
-    --input: 217 33% 17%; 
-    --ring: 224 76% 48%; 
-  }
-}
-@layer base { * { @apply border-border; } body { @apply bg-background text-foreground min-h-screen font-body; } h1, h2, h3, h4, h5, h6 { @apply font-heading; } }
-.glass { @apply bg-white/70 dark:bg-black/70 backdrop-blur-lg border border-white/20 dark:border-white/10 shadow-lg; }
-.glass-card { @apply bg-white/50 dark:bg-white/5 backdrop-blur-md border border-white/20 dark:border-white/10 hover:border-primary/50 transition-all duration-300; }
-.text-glow { @apply drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] dark:drop-shadow-[0_0_10px_rgba(0,0,0,0.5)]; }
-`
-        }
-    ];
 
-  // MANDATORY UI COMPONENTS (Fail-safe Injection)
-  const MANDATORY_UI_COMPONENTS = [
-    {
-      path: "src/components/ui/button.tsx",
-      content: `"use client"; import * as React from "react"; import { Slot } from "@radix-ui/react-slot"; import { cva, type VariantProps } from "class-variance-authority"; import { cn } from "@/lib/utils"; const buttonVariants = cva("inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-95", { variants: { variant: { default: "bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-primary/40", destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90", outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground", secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80", ghost: "hover:bg-accent hover:text-accent-foreground", link: "text-primary underline-offset-4 hover:underline", glass: "bg-white/20 backdrop-blur-md border border-white/20 hover:bg-white/30 text-white shadow-lg" }, size: { default: "h-10 px-4 py-2", sm: "h-9 rounded-md px-3", lg: "h-12 rounded-md px-8 text-base", icon: "h-10 w-10" } }, defaultVariants: { variant: "default", size: "default" } }); export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> { asChild?: boolean } const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ className, variant, size, asChild = false, ...props }, ref) => { const Comp = asChild ? Slot : "button"; return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} /> }); Button.displayName = "Button"; export { Button, buttonVariants }; export default Button;`
-    },
-    {
-      path: "src/components/layout/navbar.tsx",
-      content: `"use client"; import * as React from "react"; import Link from "next/link"; import { usePathname } from "next/navigation"; import { cn } from "@/lib/utils"; import { Button } from "@/components/ui/button"; import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; import { Menu, X } from "lucide-react"; const Navbar = () => { const pathname = usePathname(); const [isOpen, setIsOpen] = React.useState(false); const routes = [ { href: "/", label: "Home" }, { href: "/features", label: "Features" }, { href: "/pricing", label: "Pricing" }, { href: "/about", label: "About" }, ]; return ( <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"> <div className="container flex h-16 items-center justify-between"> <div className="mr-4 hidden md:flex"> <Link href="/" className="mr-6 flex items-center space-x-2"> <span className="hidden font-bold sm:inline-block">ACME Inc</span> </Link> <nav className="flex items-center space-x-6 text-sm font-medium"> {routes.map((route) => ( <Link key={route.href} href={route.href} className={cn( "transition-colors hover:text-foreground/80", pathname === route.href ? "text-foreground" : "text-foreground/60" )} > {route.label} </Link> ))} </nav> </div> <Sheet open={isOpen} onOpenChange={setIsOpen}> <SheetTrigger asChild> <Button variant="ghost" className="px-0 text-base hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 md:hidden" > <Menu className="h-6 w-6" /> <span className="sr-only">Toggle Menu</span> </Button> </SheetTrigger> <SheetContent side="left" className="pr-0"> <div className="px-7"> <Link href="/" className="flex items-center" onClick={() => setIsOpen(false)} > <span className="font-bold">ACME Inc</span> </Link> </div> <div className="my-4 h-[calc(100vh-8rem)] pb-10 pl-6"> <div className="flex flex-col space-y-3"> {routes.map((route) => ( <Link key={route.href} href={route.href} className={cn( "block px-2 py-1 text-lg", pathname === route.href ? "font-bold" : "text-muted-foreground" )} onClick={() => setIsOpen(false)} > {route.label} </Link> ))} </div> </div> </SheetContent> </Sheet> <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end"> <div className="w-full flex-1 md:w-auto md:flex-none"> </div> <nav className="flex items-center gap-2"> <Link href="/login"> <Button variant="ghost" size="sm">Log in</Button> </Link> <Link href="/signup"> <Button size="sm">Get Started</Button> </Link> </nav> </div> </div> </header> ); }; export default Navbar;`
-    },
-    {
-      path: "src/components/ui/card.tsx",
-      content: `import * as React from "react"; import { cn } from "@/lib/utils"; const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (<div ref={ref} className={cn("rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md transition-all duration-300", className)} {...props} />)); Card.displayName = "Card"; const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (<div ref={ref} className={cn("flex flex-col space-y-1.5 p-6", className)} {...props} />)); CardHeader.displayName = "CardHeader"; const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(({ className, ...props }, ref) => (<h3 ref={ref} className={cn("text-2xl font-semibold leading-none tracking-tight", className)} {...props} />)); CardTitle.displayName = "CardTitle"; const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(({ className, ...props }, ref) => (<p ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />)); CardDescription.displayName = "CardDescription"; const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (<div ref={ref} className={cn("p-6 pt-0", className)} {...props} />)); CardContent.displayName = "CardContent"; const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (<div ref={ref} className={cn("flex items-center p-6 pt-0", className)} {...props} />)); CardFooter.displayName = "CardFooter"; export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }; export default Card;`
-    },
-    {
-      path: "src/components/ui/input.tsx",
-      content: `import * as React from "react"; import { cn } from "@/lib/utils"; export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {} const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, type, ...props }, ref) => { return (<input type={type} className={cn("flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all hover:border-primary/50", className)} ref={ref} {...props} />); }); Input.displayName = "Input"; export { Input }; export default Input;`
-    },
-    {
-        path: "src/components/ui/label.tsx",
-        content: `"use client"; import * as React from "react"; import * as LabelPrimitive from "@radix-ui/react-label"; import { cva, type VariantProps } from "class-variance-authority"; import { cn } from "@/lib/utils"; const labelVariants = cva("text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"); const Label = React.forwardRef<React.ElementRef<typeof LabelPrimitive.Root>, React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root> & VariantProps<typeof labelVariants>>(({ className, ...props }, ref) => (<LabelPrimitive.Root ref={ref} className={cn(labelVariants(), className)} {...props} />)); Label.displayName = LabelPrimitive.Root.displayName; export { Label }; export default Label;`
-    },
-    {
-        path: "src/components/ui/accordion.tsx",
-        content: `"use client"; import * as React from "react"; import * as AccordionPrimitive from "@radix-ui/react-accordion"; import { ChevronDown } from "lucide-react"; import { cn } from "@/lib/utils"; const Accordion = AccordionPrimitive.Root; const AccordionItem = React.forwardRef<React.ElementRef<typeof AccordionPrimitive.Item>, React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>>(({ className, ...props }, ref) => (<AccordionPrimitive.Item ref={ref} className={cn("border-b", className)} {...props} />)); AccordionItem.displayName = "AccordionItem"; const AccordionTrigger = React.forwardRef<React.ElementRef<typeof AccordionPrimitive.Trigger>, React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>>(({ className, children, ...props }, ref) => (<AccordionPrimitive.Header className="flex"><AccordionPrimitive.Trigger ref={ref} className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", className)} {...props}>{children}<ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" /></AccordionPrimitive.Trigger></AccordionPrimitive.Header>)); AccordionTrigger.displayName = AccordionPrimitive.Trigger.displayName; const AccordionContent = React.forwardRef<React.ElementRef<typeof AccordionPrimitive.Content>, React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>>(({ className, children, ...props }, ref) => (<AccordionPrimitive.Content ref={ref} className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down" {...props}><div className={cn("pb-4 pt-0", className)}>{children}</div></AccordionPrimitive.Content>)); AccordionContent.displayName = AccordionPrimitive.Content.displayName; export { Accordion, AccordionItem, AccordionTrigger, AccordionContent }; export default Accordion;`
-    },
-    {
-        path: "src/components/ui/avatar.tsx",
-        content: `"use client"; import * as React from "react"; import * as AvatarPrimitive from "@radix-ui/react-avatar"; import { cn } from "@/lib/utils"; const Avatar = React.forwardRef<React.ElementRef<typeof AvatarPrimitive.Root>, React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>>(({ className, ...props }, ref) => (<AvatarPrimitive.Root ref={ref} className={cn("relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full", className)} {...props} />)); Avatar.displayName = AvatarPrimitive.Root.displayName; const AvatarImage = React.forwardRef<React.ElementRef<typeof AvatarPrimitive.Image>, React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>>(({ className, ...props }, ref) => (<AvatarPrimitive.Image ref={ref} className={cn("aspect-square h-full w-full", className)} {...props} />)); AvatarImage.displayName = AvatarPrimitive.Image.displayName; const AvatarFallback = React.forwardRef<React.ElementRef<typeof AvatarPrimitive.Fallback>, React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>>(({ className, ...props }, ref) => (<AvatarPrimitive.Fallback ref={ref} className={cn("flex h-full w-full items-center justify-center rounded-full bg-muted", className)} {...props} />)); AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName; export { Avatar, AvatarImage, AvatarFallback }; export default Avatar;`
-    },
-    {
-        path: "src/components/ui/badge.tsx",
-        content: `import * as React from "react"; import { cva, type VariantProps } from "class-variance-authority"; import { cn } from "@/lib/utils"; const badgeVariants = cva("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2", { variants: { variant: { default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80", secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80", destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80", outline: "text-foreground", glass: "bg-white/10 backdrop-blur-md border border-white/20 text-white" } }, defaultVariants: { variant: "default" } }); export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {} function Badge({ className, variant, ...props }: BadgeProps) { return <div className={cn(badgeVariants({ variant }), className)} {...props} />; } export { Badge, badgeVariants }; export default Badge;`
-    },
-    {
-        path: "src/components/ui/dialog.tsx",
-        content: `"use client"; import * as React from "react"; import * as DialogPrimitive from "@radix-ui/react-dialog"; import { X } from "lucide-react"; import { cn } from "@/lib/utils"; const Dialog = DialogPrimitive.Root; const DialogTrigger = DialogPrimitive.Trigger; const DialogPortal = DialogPrimitive.Portal; const DialogClose = DialogPrimitive.Close; const DialogOverlay = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Overlay>, React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>>(({ className, ...props }, ref) => (<DialogPrimitive.Overlay ref={ref} className={cn("fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0", className)} {...props} />)); DialogOverlay.displayName = DialogPrimitive.Overlay.displayName; const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Content>, React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>>(({ className, children, ...props }, ref) => (<DialogPortal><DialogOverlay /><DialogPrimitive.Content ref={ref} className={cn("fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg", className)} {...props}>{children}<DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"><X className="h-4 w-4" /><span className="sr-only">Close</span></DialogPrimitive.Close></DialogPrimitive.Content></DialogPortal>)); DialogContent.displayName = DialogPrimitive.Content.displayName; const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (<div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)} {...props} />); DialogHeader.displayName = "DialogHeader"; const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (<div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props} />); DialogFooter.displayName = "DialogFooter"; const DialogTitle = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Title>, React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>>(({ className, ...props }, ref) => (<DialogPrimitive.Title ref={ref} className={cn("text-lg font-semibold leading-none tracking-tight", className)} {...props} />)); DialogTitle.displayName = DialogPrimitive.Title.displayName; const DialogDescription = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Description>, React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>>(({ className, ...props }, ref) => (<DialogPrimitive.Description ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />)); DialogDescription.displayName = DialogPrimitive.Description.displayName; export { Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription };`
-    },
-    {
-        path: "src/components/ui/dropdown-menu.tsx",
-        content: `"use client"; import * as React from "react"; import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"; import { Check, ChevronRight, Circle } from "lucide-react"; import { cn } from "@/lib/utils"; const DropdownMenu = DropdownMenuPrimitive.Root; const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger; const DropdownMenuGroup = DropdownMenuPrimitive.Group; const DropdownMenuPortal = DropdownMenuPrimitive.Portal; const DropdownMenuSub = DropdownMenuPrimitive.Sub; const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup; const DropdownMenuSubTrigger = React.forwardRef<React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>, React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> & { inset?: boolean }>(({ className, inset, children, ...props }, ref) => (<DropdownMenuPrimitive.SubTrigger ref={ref} className={cn("flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent", inset && "pl-8", className)} {...props}>{children}<ChevronRight className="ml-auto h-4 w-4" /></DropdownMenuPrimitive.SubTrigger>)); DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName; const DropdownMenuSubContent = React.forwardRef<React.ElementRef<typeof DropdownMenuPrimitive.SubContent>, React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>>(({ className, ...props }, ref) => (<DropdownMenuPrimitive.SubContent ref={ref} className={cn("z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2", className)} {...props} />)); DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName; const DropdownMenuContent = React.forwardRef<React.ElementRef<typeof DropdownMenuPrimitive.Content>, React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>>(({ className, sideOffset = 4, ...props }, ref) => (<DropdownMenuPrimitive.Portal><DropdownMenuPrimitive.Content ref={ref} sideOffset={sideOffset} className={cn("z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2", className)} {...props} /></DropdownMenuPrimitive.Portal>)); DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName; const DropdownMenuItem = React.forwardRef<React.ElementRef<typeof DropdownMenuPrimitive.Item>, React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & { inset?: boolean }>(({ className, inset, ...props }, ref) => (<DropdownMenuPrimitive.Item ref={ref} className={cn("relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", inset && "pl-8", className)} {...props} />)); DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName; const DropdownMenuCheckboxItem = React.forwardRef<React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>, React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>>(({ className, children, checked, ...props }, ref) => (<DropdownMenuPrimitive.CheckboxItem ref={ref} className={cn("relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)} checked={checked} {...props}><span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center"><DropdownMenuPrimitive.ItemIndicator><Check className="h-4 w-4" /></DropdownMenuPrimitive.ItemIndicator></span>{children}</DropdownMenuPrimitive.CheckboxItem>)); DropdownMenuCheckboxItem.displayName = DropdownMenuPrimitive.CheckboxItem.displayName; const DropdownMenuRadioItem = React.forwardRef<React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>, React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem>>(({ className, children, ...props }, ref) => (<DropdownMenuPrimitive.RadioItem ref={ref} className={cn("relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)} {...props}><span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center"><DropdownMenuPrimitive.ItemIndicator><Circle className="h-2 w-2 fill-current" /></DropdownMenuPrimitive.ItemIndicator></span>{children}</DropdownMenuPrimitive.RadioItem>)); DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName; const DropdownMenuLabel = React.forwardRef<React.ElementRef<typeof DropdownMenuPrimitive.Label>, React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> & { inset?: boolean }>(({ className, inset, ...props }, ref) => (<DropdownMenuPrimitive.Label ref={ref} className={cn("px-2 py-1.5 text-sm font-semibold", inset && "pl-8", className)} {...props} />)); DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName; const DropdownMenuSeparator = React.forwardRef<React.ElementRef<typeof DropdownMenuPrimitive.Separator>, React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Separator>>(({ className, ...props }, ref) => (<DropdownMenuPrimitive.Separator ref={ref} className={cn("-mx-1 my-1 h-px bg-muted", className)} {...props} />)); DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName; const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => (<span className={cn("ml-auto text-xs tracking-widest opacity-60", className)} {...props} />); DropdownMenuShortcut.displayName = "DropdownMenuShortcut"; export { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuCheckboxItem, DropdownMenuRadioItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuGroup, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuRadioGroup };`
-    },
-    {
-        path: "src/components/ui/separator.tsx",
-        content: `"use client"; import * as React from "react"; import * as SeparatorPrimitive from "@radix-ui/react-separator"; import { cn } from "@/lib/utils"; const Separator = React.forwardRef<React.ElementRef<typeof SeparatorPrimitive.Root>, React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root>>(({ className, orientation = "horizontal", ...props }, ref) => (<SeparatorPrimitive.Root ref={ref} decorative orientation={orientation} className={cn("shrink-0 bg-border", orientation === "horizontal" ? "h-[1px] w-full" : "h-full w-[1px]", className)} {...props} />)); Separator.displayName = SeparatorPrimitive.Root.displayName; export { Separator }; export default Separator;`
-    },
-    {
-        path: "src/components/ui/scroll-area.tsx",
-        content: `"use client"; import * as React from "react"; import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"; import { cn } from "@/lib/utils"; const ScrollArea = React.forwardRef<React.ElementRef<typeof ScrollAreaPrimitive.Root>, React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>>(({ className, children, ...props }, ref) => (<ScrollAreaPrimitive.Root ref={ref} className={cn("relative overflow-hidden", className)} {...props}><ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">{children}</ScrollAreaPrimitive.Viewport><ScrollBar /></ScrollAreaPrimitive.Root>)); ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName; const ScrollBar = React.forwardRef<React.ElementRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>, React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>>(({ className, orientation = "vertical", ...props }, ref) => (<ScrollAreaPrimitive.ScrollAreaScrollbar ref={ref} orientation={orientation} className={cn("flex touch-none select-none transition-colors", orientation === "vertical" && "h-full w-2.5 border-l border-l-transparent p-[1px]", orientation === "horizontal" && "h-2.5 flex-col border-t border-t-transparent p-[1px]", className)} {...props}><ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" /></ScrollAreaPrimitive.ScrollAreaScrollbar>)); ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName; export { ScrollArea, ScrollBar }; export default ScrollArea;`
-    },
-    {
-        path: "src/components/ui/switch.tsx",
-        content: `"use client"; import * as React from "react"; import * as SwitchPrimitive from "@radix-ui/react-switch"; import { cn } from "@/lib/utils"; const Switch = React.forwardRef<React.ElementRef<typeof SwitchPrimitive.Root>, React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>>(({ className, ...props }, ref) => (<SwitchPrimitive.Root className={cn("peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input", className)} {...props} ref={ref}><SwitchPrimitive.Thumb className={cn("pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0")} /></SwitchPrimitive.Root>)); Switch.displayName = SwitchPrimitive.Root.displayName; export { Switch }; export default Switch;`
-    },
-    {
-        path: "src/components/ui/textarea.tsx",
-        content: `import * as React from "react"; import { cn } from "@/lib/utils"; export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {} const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, ...props }, ref) => { return (<textarea className={cn("flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", className)} ref={ref} {...props} />); }); Textarea.displayName = "Textarea"; export { Textarea }; export default Textarea;`
-    },
-    {
-        path: "src/components/ui/tabs.tsx",
-        content: `"use client"; import * as React from "react"; import * as TabsPrimitive from "@radix-ui/react-tabs"; import { cn } from "@/lib/utils"; const Tabs = TabsPrimitive.Root; const TabsList = React.forwardRef<React.ElementRef<typeof TabsPrimitive.List>, React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>>(({ className, ...props }, ref) => (<TabsPrimitive.List ref={ref} className={cn("inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground", className)} {...props} />)); TabsList.displayName = TabsPrimitive.List.displayName; const TabsTrigger = React.forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>>(({ className, ...props }, ref) => (<TabsPrimitive.Trigger ref={ref} className={cn("inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm", className)} {...props} />)); TabsTrigger.displayName = TabsPrimitive.Trigger.displayName; const TabsContent = React.forwardRef<React.ElementRef<typeof TabsPrimitive.Content>, React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>>(({ className, ...props }, ref) => (<TabsPrimitive.Content ref={ref} className={cn("mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", className)} {...props} />)); TabsContent.displayName = TabsPrimitive.Content.displayName; export { Tabs, TabsList, TabsTrigger, TabsContent }; export default Tabs;`
-    },
-    {
-        path: "src/components/ui/select.tsx",
-        content: `"use client"; import * as React from "react"; import * as SelectPrimitive from "@radix-ui/react-select"; import { Check, ChevronDown, ChevronUp } from "lucide-react"; import { cn } from "@/lib/utils"; const Select = SelectPrimitive.Root; const SelectGroup = SelectPrimitive.Group; const SelectValue = SelectPrimitive.Value; const SelectTrigger = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Trigger>, React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>>(({ className, children, ...props }, ref) => (<SelectPrimitive.Trigger ref={ref} className={cn("flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1", className)} {...props}>{children}<SelectPrimitive.Icon asChild><ChevronDown className="h-4 w-4 opacity-50" /></SelectPrimitive.Icon></SelectPrimitive.Trigger>)); SelectTrigger.displayName = SelectPrimitive.Trigger.displayName; const SelectScrollUpButton = React.forwardRef<React.ElementRef<typeof SelectPrimitive.ScrollUpButton>, React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>>(({ className, ...props }, ref) => (<SelectPrimitive.ScrollUpButton ref={ref} className={cn("flex cursor-default items-center justify-center py-1", className)} {...props}><ChevronUp className="h-4 w-4" /></SelectPrimitive.ScrollUpButton>)); SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName; const SelectScrollDownButton = React.forwardRef<React.ElementRef<typeof SelectPrimitive.ScrollDownButton>, React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>>(({ className, ...props }, ref) => (<SelectPrimitive.ScrollDownButton ref={ref} className={cn("flex cursor-default items-center justify-center py-1", className)} {...props}><ChevronDown className="h-4 w-4" /></SelectPrimitive.ScrollDownButton>)); SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayName; const SelectContent = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Content>, React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>>(({ className, children, position = "popper", ...props }, ref) => (<SelectPrimitive.Portal><SelectPrimitive.Content ref={ref} className={cn("relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2", position === "popper" && "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1", className)} position={position} {...props}><SelectScrollUpButton /><SelectPrimitive.Viewport className={cn("p-1", position === "popper" && "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]")}>{children}</SelectPrimitive.Viewport><SelectScrollDownButton /></SelectPrimitive.Content></SelectPrimitive.Portal>)); SelectContent.displayName = SelectPrimitive.Content.displayName; const SelectLabel = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Label>, React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>>(({ className, ...props }, ref) => (<SelectPrimitive.Label ref={ref} className={cn("py-1.5 pl-8 pr-2 text-sm font-semibold", className)} {...props} />)); SelectLabel.displayName = SelectPrimitive.Label.displayName; const SelectItem = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Item>, React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>>(({ className, children, ...props }, ref) => (<SelectPrimitive.Item ref={ref} className={cn("relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)} {...props}><span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center"><SelectPrimitive.ItemIndicator><Check className="h-4 w-4" /></SelectPrimitive.ItemIndicator></span><SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText></SelectPrimitive.Item>)); SelectItem.displayName = SelectPrimitive.Item.displayName; const SelectSeparator = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Separator>, React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>>(({ className, ...props }, ref) => (<SelectPrimitive.Separator ref={ref} className={cn("-mx-1 my-1 h-px bg-muted", className)} {...props} />)); SelectSeparator.displayName = SelectPrimitive.Separator.displayName; export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectLabel, SelectItem, SelectSeparator, SelectScrollUpButton, SelectScrollDownButton };`
-    },
-    {
-        path: "src/components/ui/sheet.tsx",
-        content: `"use client"; import * as React from "react"; import * as SheetPrimitive from "@radix-ui/react-dialog"; import { cva, type VariantProps } from "class-variance-authority"; import { X } from "lucide-react"; import { cn } from "@/lib/utils"; const Sheet = SheetPrimitive.Root; const SheetTrigger = SheetPrimitive.Trigger; const SheetClose = SheetPrimitive.Close; const SheetPortal = SheetPrimitive.Portal; const SheetOverlay = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Overlay>, React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>>(({ className, ...props }, ref) => (<SheetPrimitive.Overlay className={cn("fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0", className)} {...props} ref={ref} />)); SheetOverlay.displayName = SheetPrimitive.Overlay.displayName; const sheetVariants = cva("fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500", { variants: { side: { top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top", bottom: "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom", left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm", right: "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm" } }, defaultVariants: { side: "right" } }); interface SheetContentProps extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>, VariantProps<typeof sheetVariants> {} const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(({ side = "right", className, children, ...props }, ref) => (<SheetPortal><SheetOverlay /><SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>{children}<SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"><X className="h-4 w-4" /><span className="sr-only">Close</span></SheetPrimitive.Close></SheetPrimitive.Content></SheetPortal>)); SheetContent.displayName = SheetPrimitive.Content.displayName; const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (<div className={cn("flex flex-col space-y-2 text-center sm:text-left", className)} {...props} />); SheetHeader.displayName = "SheetHeader"; const SheetFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (<div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props} />); SheetFooter.displayName = "SheetFooter"; const SheetTitle = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Title>, React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>>(({ className, ...props }, ref) => (<SheetPrimitive.Title ref={ref} className={cn("text-lg font-semibold text-foreground", className)} {...props} />)); SheetTitle.displayName = SheetPrimitive.Title.displayName; const SheetDescription = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Description>, React.ComponentPropsWithoutRef<typeof SheetPrimitive.Description>>(({ className, ...props }, ref) => (<SheetPrimitive.Description ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />)); SheetDescription.displayName = SheetPrimitive.Description.displayName; export { Sheet, SheetPortal, SheetOverlay, SheetTrigger, SheetClose, SheetContent, SheetHeader, SheetFooter, SheetTitle, SheetDescription };`
-    },
-    {
-      path: "src/components/landing/hero.tsx",
-      content: `"use client"; import { Button } from "@/components/ui/button"; import { motion } from "framer-motion"; import Link from "next/link"; import { ArrowRight } from "lucide-react"; export const Hero = () => { return ( <section className="relative overflow-hidden pt-32 pb-24 lg:pt-48 lg:pb-32"> <div className="container px-4 md:px-6 relative z-10"> <div className="mx-auto max-w-4xl text-center"> <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} > <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-6"> Introducing the Future </span> </motion.div> <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="text-4xl font-bold tracking-tight sm:text-6xl bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 mb-6 drop-shadow-sm" > Build your dream website <br className="hidden sm:block" /> in minutes, not months. </motion.h1> <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed" > The world&apos;s most advanced AI website builder. Generate production-ready code, beautiful designs, and deploy instantly. </motion.p> <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} className="flex flex-col sm:flex-row gap-4 justify-center items-center" > <Button size="lg" className="h-12 px-8 text-base"> Get Started Free <ArrowRight className="ml-2 h-4 w-4" /> </Button> <Button size="lg" variant="outline" className="h-12 px-8 text-base"> View Demo </Button> </motion.div> </div> </div> <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background -z-10" /> </section> ); }; export default Hero;`
-    },
-    {
-      path: "src/components/landing/features.tsx",
-      content: `"use client"; import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"; import { Zap, Shield, Smartphone, Globe, Code, Layers } from "lucide-react"; const features = [ { title: "Lightning Fast", description: "Built on Next.js 14 for incredible performance and SEO optimization.", icon: Zap, }, { title: "Secure by Design", description: "Enterprise-grade security features built-in from the ground up.", icon: Shield, }, { title: "Mobile First", description: "Responsive design that looks beautiful on any device, anywhere.", icon: Smartphone, }, { title: "Global Scale", description: "Deploy to the edge in seconds and reach users worldwide.", icon: Globe, }, { title: "Clean Code", description: "Generated code is clean, maintainable, and follows best practices.", icon: Code, }, { title: "Modern Stack", description: "Using the latest technologies: React, Tailwind, and TypeScript.", icon: Layers, }, ]; export const Features = () => { return ( <section className="py-24 bg-background"> <div className="container px-4 md:px-6"> <div className="text-center mb-16"> <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4"> Features that set us apart </h2> <p className="text-muted-foreground text-lg max-w-2xl mx-auto"> Everything you need to build world-class applications. </p> </div> <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"> {features.map((feature, index) => ( <Card key={index} className="border-border/50 bg-card/50 backdrop-blur-sm hover:bg-accent/5 transition-colors"> <CardHeader> <div className="p-2 w-fit rounded-lg bg-primary/10 text-primary mb-4"> <feature.icon className="h-6 w-6" /> </div> <CardTitle>{feature.title}</CardTitle> </CardHeader> <CardContent> <CardDescription className="text-base">{feature.description}</CardDescription> </CardContent> </Card> ))} </div> </div> </section> ); }; export default Features;`
-    },
-    {
-      path: "src/components/landing/faq.tsx",
-      content: `"use client"; import { Accordion, AccordionContent, AccordionItem, AccordionTrigger, } from "@/components/ui/accordion"; export const FAQ = () => { const faqs = [ { question: "How does it work?", answer: "We use advanced AI to analyze your requirements and build the perfect solution for you.", }, { question: "Is it secure?", answer: "Yes, we use bank-grade encryption and security practices to protect your data.", }, { question: "Can I cancel anytime?", answer: "Absolutely. You can cancel your subscription at any time with no hidden fees.", }, { question: "Do you offer support?", answer: "We offer 24/7 customer support to help you with any issues you might encounter.", }, ]; return ( <section className="py-24 bg-secondary/30"> <div className="container px-4 md:px-6"> <div className="text-center mb-16"> <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4"> Frequently Asked Questions </h2> <p className="text-muted-foreground text-lg max-w-2xl mx-auto"> Everything you need to know about our product and billing. </p> </div> <div className="max-w-3xl mx-auto"> <Accordion type="single" collapsible className="w-full"> {faqs.map((faq, index) => ( <AccordionItem key={index} value={\`item-\${index}\`}> <AccordionTrigger>{faq.question}</AccordionTrigger> <AccordionContent>{faq.answer}</AccordionContent> </AccordionItem> ))} </Accordion> </div> </div> </section> ); }; export default FAQ;`
-    },
-    {
-      path: "src/components/landing/footer.tsx",
-      content: `"use client"; import Link from "next/link"; import { Facebook, Twitter, Instagram, Linkedin, Github } from "lucide-react"; export const Footer = () => { return ( <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-12"> <div className="container px-4 md:px-6"> <div className="grid grid-cols-1 md:grid-cols-4 gap-8"> <div className="space-y-4"> <h3 className="text-lg font-bold">ACME Inc</h3> <p className="text-sm text-muted-foreground"> Building the future of digital experiences. </p> <div className="flex space-x-4"> <Link href="#" className="text-muted-foreground hover:text-foreground"> <Twitter className="h-5 w-5" /> </Link> <Link href="#" className="text-muted-foreground hover:text-foreground"> <Github className="h-5 w-5" /> </Link> <Link href="#" className="text-muted-foreground hover:text-foreground"> <Linkedin className="h-5 w-5" /> </Link> </div> </div> <div> <h3 className="font-semibold mb-4">Product</h3> <ul className="space-y-2 text-sm text-muted-foreground"> <li><Link href="#" className="hover:text-foreground">Features</Link></li> <li><Link href="#" className="hover:text-foreground">Pricing</Link></li> <li><Link href="#" className="hover:text-foreground">Security</Link></li> <li><Link href="#" className="hover:text-foreground">Roadmap</Link></li> </ul> </div> <div> <h3 className="font-semibold mb-4">Company</h3> <ul className="space-y-2 text-sm text-muted-foreground"> <li><Link href="#" className="hover:text-foreground">About</Link></li> <li><Link href="#" className="hover:text-foreground">Careers</Link></li> <li><Link href="#" className="hover:text-foreground">Blog</Link></li> <li><Link href="#" className="hover:text-foreground">Contact</Link></li> </ul> </div> <div> <h3 className="font-semibold mb-4">Legal</h3> <ul className="space-y-2 text-sm text-muted-foreground"> <li><Link href="#" className="hover:text-foreground">Privacy Policy</Link></li> <li><Link href="#" className="hover:text-foreground">Terms of Service</Link></li> <li><Link href="#" className="hover:text-foreground">Cookie Policy</Link></li> </ul> </div> </div> <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground"> <p>&copy; {new Date().getFullYear()} ACME Inc. All rights reserved.</p> </div> </div> </footer> ); }; export default Footer;`
-    },
-    {
-      path: "src/components/landing/logos.tsx",
-      content: `"use client"; export const Logos = () => { const logos = [ "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Google_2015_logo.svg/2560px-Google_2015_logo.svg.png", "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/IBM_logo.svg/2560px-IBM_logo.svg.png", "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Microsoft_logo_%282012%29.svg/2560px-Microsoft_logo_%282012%29.svg.png", "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/2560px-Amazon_logo.svg.png", "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Netflix_2015_logo.svg/2560px-Netflix_2015_logo.svg.png", ]; return ( <section className="py-12 border-y bg-muted/30"> <div className="container px-4 md:px-6"> <p className="text-center text-sm font-semibold text-muted-foreground mb-8 uppercase tracking-widest"> Trusted by industry leaders </p> <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 grayscale opacity-50 hover:opacity-100 transition-opacity duration-500"> {logos.map((logo, i) => ( <div key={i} className="h-8 md:h-10 relative w-32 md:w-40"> <img src={logo} alt="Logo" className="object-contain w-full h-full" /> </div> ))} </div> </div> </section> ); }; export default Logos;`
-    },
-    {
-      path: "src/components/landing/how-it-works.tsx",
-      content: `"use client"; import { CheckCircle2 } from "lucide-react"; export const HowItWorks = () => { const steps = [ { title: "Connect", description: "Link your data sources in seconds with our secure API integrations." }, { title: "Analyze", description: "Our AI processes your data to find hidden patterns and opportunities." }, { title: "Optimize", description: "Automatically apply improvements to boost performance and revenue." } ]; return ( <section className="py-24 bg-background"> <div className="container px-4 md:px-6"> <div className="text-center mb-16"> <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">How It Works</h2> <p className="text-muted-foreground text-lg max-w-2xl mx-auto"> Simple, transparent, and powerful. </p> </div> <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative"> <div className="hidden md:block absolute top-12 left-[16%] right-[16%] h-0.5 bg-border -z-10" /> {steps.map((step, i) => ( <div key={i} className="flex flex-col items-center text-center bg-background p-6 rounded-lg relative"> <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold mb-6 ring-4 ring-background"> {i + 1} </div> <h3 className="text-xl font-bold mb-3">{step.title}</h3> <p className="text-muted-foreground">{step.description}</p> </div> ))} </div> </div> </section> ); }; export default HowItWorks;`
-    },
-    {
-      path: "src/components/landing/testimonials.tsx",
-      content: `"use client"; import { Card, CardContent, CardHeader } from "@/components/ui/card"; import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; export const Testimonials = () => { const testimonials = [ { name: "Sarah Johnson", role: "CTO at TechFlow", content: "The best solution we've used. It completely transformed our workflow.", avatar: "SJ" }, { name: "Michael Chen", role: "Founder at StartupX", content: "Incredible attention to detail. The UI is stunning and the code is clean.", avatar: "MC" }, { name: "Emily Davis", role: "Product Manager", content: "Fast, reliable, and secure. I highly recommend this to any team.", avatar: "ED" } ]; return ( <section className="py-24 bg-muted/30"> <div className="container px-4 md:px-6"> <div className="text-center mb-16"> <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Loved by Developers</h2> <p className="text-muted-foreground text-lg max-w-2xl mx-auto"> Join thousands of satisfied users building the future. </p> </div> <div className="grid grid-cols-1 md:grid-cols-3 gap-8"> {testimonials.map((t, i) => ( <Card key={i} className="bg-background/60 backdrop-blur-sm border-none shadow-sm"> <CardHeader className="flex flex-row items-center gap-4 pb-4"> <Avatar> <AvatarFallback>{t.avatar}</AvatarFallback> </Avatar> <div> <p className="text-sm font-medium leading-none">{t.name}</p> <p className="text-xs text-muted-foreground">{t.role}</p> </div> </CardHeader> <CardContent> <p className="text-muted-foreground italic">"{t.content}"</p> </CardContent> </Card> ))} </div> </div> </section> ); }; export default Testimonials;`
-    },
-    {
-      path: "src/components/landing/pricing.tsx",
-      content: `"use client"; import { Button } from "@/components/ui/button"; import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"; import { Check } from "lucide-react"; export const Pricing = () => { return ( <section className="py-24 bg-background"> <div className="container px-4 md:px-6"> <div className="text-center mb-16"> <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Simple Pricing</h2> <p className="text-muted-foreground text-lg max-w-2xl mx-auto"> Choose the plan that fits your needs. </p> </div> <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto"> <Card> <CardHeader> <CardTitle>Starter</CardTitle> <CardDescription>For individuals</CardDescription> </CardHeader> <CardContent> <div className="text-3xl font-bold mb-6">$0<span className="text-sm font-normal text-muted-foreground">/mo</span></div> <ul className="space-y-2 text-sm"> <li className="flex items-center"><Check className="mr-2 h-4 w-4 text-primary" /> 1 Project</li> <li className="flex items-center"><Check className="mr-2 h-4 w-4 text-primary" /> Community Support</li> </ul> </CardContent> <CardFooter> <Button className="w-full" variant="outline">Get Started</Button> </CardFooter> </Card> <Card className="border-primary shadow-lg scale-105 relative"> <div className="absolute -top-4 left-0 right-0 flex justify-center"><span className="bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full">Most Popular</span></div> <CardHeader> <CardTitle>Pro</CardTitle> <CardDescription>For teams</CardDescription> </CardHeader> <CardContent> <div className="text-3xl font-bold mb-6">$29<span className="text-sm font-normal text-muted-foreground">/mo</span></div> <ul className="space-y-2 text-sm"> <li className="flex items-center"><Check className="mr-2 h-4 w-4 text-primary" /> Unlimited Projects</li> <li className="flex items-center"><Check className="mr-2 h-4 w-4 text-primary" /> Priority Support</li> <li className="flex items-center"><Check className="mr-2 h-4 w-4 text-primary" /> Analytics Dashboard</li> </ul> </CardContent> <CardFooter> <Button className="w-full">Get Started</Button> </CardFooter> </Card> <Card> <CardHeader> <CardTitle>Enterprise</CardTitle> <CardDescription>For organizations</CardDescription> </CardHeader> <CardContent> <div className="text-3xl font-bold mb-6">Custom</div> <ul className="space-y-2 text-sm"> <li className="flex items-center"><Check className="mr-2 h-4 w-4 text-primary" /> Dedicated Support</li> <li className="flex items-center"><Check className="mr-2 h-4 w-4 text-primary" /> Custom Integrations</li> <li className="flex items-center"><Check className="mr-2 h-4 w-4 text-primary" /> SLA Guarantee</li> </ul> </CardContent> <CardFooter> <Button className="w-full" variant="outline">Contact Sales</Button> </CardFooter> </Card> </div> </div> </section> ); }; export default Pricing;`
-    },
-    {
-      path: "src/components/landing/cta.tsx",
-      content: `"use client"; import { Button } from "@/components/ui/button"; import { ArrowRight } from "lucide-react"; export const CTA = () => { return ( <section className="py-24 bg-primary text-primary-foreground relative overflow-hidden"> <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.1)_50%,transparent_75%,transparent_100%)] bg-[length:250%_250%] animate-shimmer opacity-30" /> <div className="container px-4 md:px-6 text-center relative z-10"> <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-6"> Ready to build the future? </h2> <p className="text-lg md:text-xl opacity-90 mb-10 max-w-2xl mx-auto"> Join thousands of developers who are already building superior applications. </p> <Button size="lg" variant="secondary" className="h-14 px-8 text-lg text-primary bg-background hover:bg-background/90"> Get Started Now <ArrowRight className="ml-2 h-5 w-5" /> </Button> </div> </section> ); }; export default CTA;`
-    }
-  ];
+  const { prompt, options } = validation.data;
 
-  // Declare variables OUTSIDE the try block to avoid ReferenceError
-  let prompt = "Portfolio";
-  let plan = { sql: "", description: "Standard" };
-  let currentFiles: any[] = [];
-  let image: string | null = null;
-
-  try {
-    try {
-        const body = await req.json();
-        
-        if (body.prompt && typeof body.prompt === 'string') {
-             prompt = body.prompt;
-        }
-        
-        plan = body.plan || plan;
-        currentFiles = body.currentFiles || [];
-        // FIX: Handle image being null or undefined
-        image = body.image && body.image.startsWith("data:") ? body.image : null; 
-    } catch (e) {
-        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-
-    // 2. CHECK API KEY
-    if (!process.env.OPENAI_API_KEY) {
-         return NextResponse.json(
-            { error: "OpenAI API Key is missing. Please add OPENAI_API_KEY to your .env.local file." },
-            { status: 500 }
-         );
-    }
-
-    // Determine Mode: Full Generation vs Magic Edit
-    const isMagicEdit = !!currentFiles.length && prompt.length > 0;
-    
-    // --- 3. DYNAMIC PERSONA SELECTION ---
-    // FORCE "THE LOVABLE KILLER" MODE (NO RANDOMIZATION)
-    const selectedPersona = {
-        id: "lovable-killer",
-        name: "The Lovable Killer (Ultra-Modern)",
-        description: "The absolute peak of 2024 web design. Clean, expensive, airy, and animated. It feels like Linear.app met Apple.",
-        css: "bg-white text-slate-950 selection:bg-violet-100",
-        components: "Rounded-xl, thin borders (border-black/5), heavy use of white space."
-    };
-
-    console.log(`[CODEGEN] Selected Persona: ${selectedPersona.name}`);
-
-    const systemPrompt = `
-    You are **Aether OS Intelligence Layer**, an expert in building SMART, STATEFUL, PRODUCTION-READY applications.
-    
-    Your mission: Generate apps that aren't just pretty - they're ALIVE with real functionality.
-
-    === INTELLIGENCE PHILOSOPHY ===
-    Lovable generates static demos. You generate REAL APPS that:
-    - Remember user data (persistent state)
-    - Handle complex workflows (multi-step forms, wizards)
-    - Integrate with real APIs (not fake data)
-    - Scale to production (error handling, loading states, optimization)
-
-    === MANDATORY INTELLIGENCE FEATURES ===
-
-    1. STATE MANAGEMENT (Zustand + Persistence)
-       - Use 'zustand' for global state.
-       - Use 'persist' middleware to save data to localStorage.
-       - Store user sessions, theme preferences, and form data.
-
-    2. API INTEGRATION (Real Fetch Wrappers)
-       - Create a robust API client in '/lib/api.ts'.
-       - Handle 401/403/500 errors gracefully.
-       - Show loading spinners (Loader2) during requests.
-
-    3. FORM HANDLING (React Hook Form + Zod)
-       - Validate ALL inputs with Zod schemas.
-       - Show inline error messages (text-red-500).
-       - Disable submit buttons while isSubmitting.
-
-    4. REAL-TIME & OPTIMISTIC UPDATES
-       - Update UI immediately before server response.
-       - Rollback if API fails.
-       - Use SWR or React Query patterns (simulated if needed).
-
-    5. INTELLIGENT ERROR RECOVERY
-       - Wrap risky components in Error Boundaries.
-       - Show "Try Again" buttons instead of crashing.
-
-    === MANDATORY ARCHITECTURE RULES (INHERITED) ===
-    1. IMPORT HIERARCHY: constants -> utils -> ui -> features -> page.
-    2. NO CIRCULAR DEPENDENCIES: Extract shared types/utils to /lib.
-    3. NAMED EXPORTS ONLY: export function Component() {...}
-    
-    === MANDATORY DESIGN STANDARDS (INHERITED) ===
-    1. AETHER GRADIENTS: violet-purple-indigo themes.
-    2. GLASSMORPHISM 2.0: backdrop-blur-xl + border-white/10.
-    3. FRAMER MOTION: Animate presence, hover, and layout changes.
-
-    === OUTPUT REQUIREMENTS ===
-    The generated code must be a FULL-STACK (Frontend + Mock API logic) solution.
-    Include a 'src/lib/store.ts' file for Zustand state.
-    Include a 'src/components/auth/signup-form.tsx' if authentication is implied.
-
-    **RETURN FORMAT**: JSON object with a "files" array containing { path, content }.
-    **EXECUTE**: Build the user's request with AETHER PROTOCOL V2 standards.
-    `;
-
-    // 3. CALL OPENAI (With Retry & Timeout)
-    console.log("[CODEGEN] Calling OpenAI...");
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    
-    // RETRY LOGIC
-    let attempts = 0;
-    const MAX_RETRIES = 2;
-    let lastError: any = null;
-
-    while (attempts < MAX_RETRIES) {
-        attempts++;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 180000); // 180s (3min) Timeout per attempt
-
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (data: any) => {
         try {
-            console.log(`[CODEGEN] Attempt ${attempts}...`);
-            
-            // CONSTRUCT MESSAGES FOR GPT-4o VISION
-            const userContent: any[] = [{ type: "text", text: `Prompt: ${prompt}\n\nPlan: ${plan.description}\n\nREMEMBER: You are the "${selectedPersona.name}" Persona. DESIGN ACCORDINGLY.` }];
-            
-            if (image) {
-                userContent.push({
-                    type: "image_url",
-                    image_url: {
-                        url: image, // Base64 or URL
-                    }
-                });
-                console.log("[CODEGEN] Image attached to prompt");
-            }
-
-            const completion = await openai.chat.completions.create({
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userContent as any },
-                // RANDOM SEED to force variety in code structure
-                { role: "system", content: `SEED: ${Date.now()}-${Math.random()}-FORCE_VARIATION` }
-              ],
-              model: "gpt-4o",
-              response_format: { type: "json_object" },
-              "temperature": 1.0, // MAXIMUM CREATIVITY
-              "top_p": 1.0,
-            }, { signal: controller.signal });
-
-            clearTimeout(timeoutId);
-            let content = completion.choices[0].message.content;
-            const finishReason = completion.choices[0].finish_reason;
-
-            if (!content) throw new Error("No content from OpenAI");
-            
-            // 4. PARSE & PROCESS
-            let result;
-            try {
-                result = JSON.parse(content);
-            } catch (parseError) {
-                console.warn(`[CODEGEN] JSON Parse Failed (Reason: ${finishReason}). Attempting repair...`);
-                try {
-                    const repaired = jsonrepair(content);
-                    result = JSON.parse(repaired);
-                    console.log("[CODEGEN] JSON Repaired Successfully.");
-                } catch (repairError) {
-                    console.error("[CODEGEN] JSON Repair Failed:", repairError);
-                    throw new Error("JSON Parse Error");
-                }
-            }
-            
-            // Normalize paths
-            if (!result.files || !Array.isArray(result.files)) {
-                 if (result.project && result.project.files) result.files = result.project.files;
-                 else throw new Error("Missing 'files' array in response");
-            }
-
-            result.files = result.files.map((file: any) => {
-                if (!file || !file.path) return file;
-                if (file.content) {
-                    file.content = file.content.replace(/from ['"]@components\//g, 'from "@/components/');
-                    file.content = file.content.replace(/from ['"]@lib\//g, 'from "@/lib/');
-                }
-                if (file.path.startsWith('/')) file.path = file.path.substring(1);
-                if (file.path === 'page.tsx') file.path = 'src/app/page.tsx';
-                if (file.path.startsWith("app/")) file.path = "src/" + file.path;
-                if (file.path.startsWith("components/")) file.path = "src/" + file.path;
-                if (file.path.startsWith("lib/")) file.path = "src/" + file.path;
-                return file;
-            });
-
-            // Inject Config Files (Ensure Boilerplate is present)
-            if (!isMagicEdit) {
-                CONFIG_FILES.forEach(configFile => {
-                    const existingIndex = result.files.findIndex((f: any) => f.path === configFile.path);
-                    if (existingIndex !== -1) {
-                        result.files[existingIndex] = configFile;
-                    } else {
-                        result.files.unshift(configFile);
-                    }
-                });
-            }
-
-            // Inject Mandatory UI Components (Fail-safe for Magic Edit too)
-            MANDATORY_UI_COMPONENTS.forEach(uiComponent => {
-                const exists = result.files.some((f: any) => f.path === uiComponent.path);
-                // ALWAYS inject if missing, even in Magic Edit, to prevent "Element type is invalid" crashes
-                if (!exists) {
-                    result.files.push(uiComponent);
-                }
-            });
-
-            console.log("[CODEGEN] Success. Files:", result.files.length);
-            return NextResponse.json({ files: result.files, partial: isMagicEdit });
-
-        } catch (innerError: any) {
-            clearTimeout(timeoutId);
-            console.error(`[CODEGEN] Attempt ${attempts} failed:`, innerError);
-            lastError = innerError;
+            controller.enqueue(encoder.encode(JSON.stringify(data) + '\n'));
+        } catch (e) {
+            // Controller might be closed if client disconnected
+            console.error("Failed to enqueue data:", e);
         }
+      };
+
+      try {
+        const generator = new SuperiorCodeGenerator();
+        const validator = new ValidationEngine();
+
+        // 1. INTENT ANALYSIS
+        send({ status: 'planning', progress: 5, message: '🧠 Analyzing your requirements...' });
+        const intent = await generator.parseIntent(prompt);
+        send({ status: 'planning', progress: 10, message: `🎯 Detected intent: ${intent.projectType} (${intent.complexity})` });
+        
+        // 2. ARCHITECTURE DESIGN
+        send({ status: 'planning', progress: 15, message: '🏗️ Designing system architecture...' });
+        const architecture = await generator.generateArchitecture(intent, prompt);
+        send({ status: 'planning', progress: 25, message: `📋 Blueprint ready: ${architecture.components.length} components planned.` });
+
+        // 3. CODE GENERATION (The Long Part)
+        send({ status: 'generating', progress: 30, message: '🚀 Starting code generation engine...', dependencies: architecture.dependencies });
+        
+        const rawFiles = await generator.generateCodeWithRouting(
+            intent, 
+            architecture, 
+            prompt, 
+            options,
+            (status) => {
+                // Relay detailed status from the generator
+                // We map generator progress roughly to 30-80% range
+                send({ status: 'generating', progress: undefined, message: status });
+            }
+        );
+        
+        // 4. VALIDATION & HEALING
+        send({ status: 'validating', progress: 85, message: '🛡️ Validating code integrity...' });
+        const validationResult = await validator.validateBeforeGeneration(rawFiles);
+        
+        if (!validationResult.valid) {
+             send({ status: 'validating', progress: 90, message: '🔧 Auto-healing detected issues...' });
+        } else {
+             send({ status: 'validating', progress: 95, message: '✅ Code passed all checks.' });
+        }
+
+        // 5. FINALIZATION
+        send({ 
+          status: 'complete', 
+          progress: 100, 
+          message: '✨ System Online. Ready for preview.',
+          files: validationResult.files,
+          dependencies: architecture.dependencies,
+          errors: validationResult.errors 
+        });
+
+        controller.close();
+      } catch (error: any) {
+        console.error('Generation failed:', error);
+        send({
+          status: 'error',
+          message: error.message || 'An unexpected error occurred',
+          progress: 0
+        });
+        controller.close();
+      }
     }
+  });
 
-    const errorMessage = lastError?.message || "Unknown Error";
-    return NextResponse.json(
-        { error: `Generation failed: ${errorMessage}. The AI Architect is currently overloaded or encountered an error.` }, 
-        { status: 500 }
-    );
-
-    } catch (fatalError: any) {
-    console.error("[CODEGEN] Fatal Error:", fatalError);
-    return NextResponse.json(
-        { error: "Internal Server Error" }, 
-        { status: 500 }
-    );
-  }
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Transfer-Encoding': 'chunked',
+    },
+  });
 }

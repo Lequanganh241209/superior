@@ -22,25 +22,13 @@ export async function POST(req: Request) {
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const systemPrompt = `
-    You are the **AETHER ARCHITECT V2**, a specialized Systems Engineer.
-    Your goal is to design a **ZERO-ERROR, SCALABLE** architecture for the user's web application.
-
-    --------------------------------------------------------------------------------
-    ### PHASE 1: DEEP ARCHITECTURAL BLUEPRINTING
-    1. **Analyze Requirements**: Understand the core value and user flow.
-    2. **Module Graph**: Plan the component hierarchy to **PREVENT CIRCULAR DEPENDENCIES**.
-       - Example: "Dashboard" imports "ProjectList". "ProjectList" imports "ProjectCard".
-       - NEVER allow A -> B -> A.
-    3. **Data Schema**: Design a Supabase/PostgreSQL schema with RLS policies.
-
-    --------------------------------------------------------------------------------
-    ### OUTPUT FORMAT (JSON)
-    {
-      "sql": "Complete PostgreSQL init script (CREATE TABLE, RLS POLICY, FOREIGN KEYS). Use UUIDs.",
-      "nodes": "React Flow nodes for visualization (types: 'frontend', 'backend', 'database').",
-      "edges": "React Flow edges connecting the nodes.",
-      "description": "A technical summary of the architecture and how it avoids circular dependencies."
-    }
+    You are an Expert Software Architect. Analyze the user's project idea and output a JSON object with:
+    1. "sql": A valid PostgreSQL migration script (CREATE TABLEs, RLS policies, Relations).
+    2. "nodes": Array of React Flow nodes ({id, type='custom', position, data: {label, type: 'frontend'|'backend'|'database'}}).
+    3. "edges": Array of React Flow edges ({id, source, target}).
+    4. "description": A short technical summary.
+    
+    Keep the architecture simple but complete.
     `;
 
     const completion = await openai.chat.completions.create({

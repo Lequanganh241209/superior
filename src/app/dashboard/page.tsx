@@ -1,117 +1,59 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { useState } from "react";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { ChatInterface } from "@/components/chat/ChatInterface";
+import PreviewPanel from "@/components/preview/PreviewPanel";
+import { GenerationFlow } from "@/components/generation/GenerationFlow";
+import { ConsoleOverlay } from "@/components/console/ConsoleOverlay";
 import { useProjectStore } from "@/store/project-store";
-import { DashboardSkeleton } from "@/components/dashboard/SkeletonLoader";
-import dynamic from "next/dynamic";
-
-// Dynamic Imports with explicit loading states to prevent hydration mismatches and TDZ errors
-const EmptyState = dynamic(
-  () => import("@/components/dashboard/EmptyState").then((mod) => mod.EmptyState),
-  { ssr: false, loading: () => <DashboardSkeleton /> }
-);
-
-const SplitView = dynamic(
-  () => import("@/components/editor/SplitView").then((mod) => mod.SplitView),
-  { ssr: false, loading: () => <DashboardSkeleton /> }
-);
-
-interface Project {
-  id: string;
-  name: string;
-  repo_name: string;
-  deployment_url: string;
-  status: string;
-}
-
-const healPreview = async (p: Project) => {
-  try {
-    if (p.deployment_url) {
-        const head = await fetch(p.deployment_url, { method: "HEAD" });
-        if (head.ok) return p.deployment_url;
-    }
-    const refetch = await fetch("/api/projects/list");
-    if (refetch.ok) {
-      const refreshed = await refetch.json();
-      const match =
-        refreshed.projects?.find((x: any) => x.repo_name === p.repo_name) ||
-        refreshed.projects?.[0];
-      if (match?.deployment_url) return match.deployment_url;
-    }
-  } catch {}
-  return p.deployment_url;
-};
 
 export default function Dashboard() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  const { projectName, setProjectDetails, setPreviewUrl, createProject } = useProjectStore();
-  const router = useRouter();
+  const { isGenerating, generationProgress, generationStep, generatedFiles, activeProjectId } = useProjectStore();
+  
+  // Show preview if we have an active project (even if empty initially)
+  const showPreview = !!activeProjectId;
 
-  useEffect(() => {
-    let mounted = true;
+  return (
+    <div className="h-screen w-full bg-black text-white overflow-hidden font-sans selection:bg-indigo-500/30 relative">
+      <GenerationFlow 
+        isOpen={isGenerating} 
+        progress={generationProgress} 
+        currentStep={generationStep} 
+        files={generatedFiles.map((f: any) => f.path)}
+        onCancel={() => {}} // TODO: Implement cancel
+      />
 
-    // Define async init function
-    const initDashboard = async () => {
-        try {
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (error) throw error;
-            if (!session) {
-                if (mounted) router.push("/login");
-                return;
-            }
-            if (mounted) setUser(session.user);
-        } catch (error) {
-            console.error("Auth check failed", error);
-            if (mounted) router.push("/login");
-        } finally {
-             // Ensure loading is turned off even if auth fails/redirects, 
-             // but strictly after the checks.
-             if (mounted) setIsLoading(false);
-        }
+      <ResizablePanelGroup direction="horizontal" className="h-full">
+        
+        {/* Panel 1: Sidebar (Navigation) */}
+        <ResizablePanel defaultSize={15} minSize={15} maxSize={20} className="min-w-[240px] border-r border-white/5">
+          <Sidebar />
+        </ResizablePanel>
+        
+        <ResizableHandle className="bg-transparent hover:bg-indigo-500/50 transition-colors w-[1px]" />
 
-        // Secondary: Restore state & fetch projects (Non-blocking for UI)
-        if (mounted) {
-             const { activeProjectId, projects, generatedFiles, setGeneratedFiles, setPreviewUrl } = useProjectStore.getState();
-             if (activeProjectId && projects.length > 0 && (!generatedFiles || generatedFiles.length === 0)) {
-                 const activeProject = projects.find(p => p.id === activeProjectId);
-                 if (activeProject && activeProject.files && activeProject.files.length > 0) {
-                     setGeneratedFiles(activeProject.files);
-                     if (activeProject.previewUrl) setPreviewUrl(activeProject.previewUrl);
-                 }
-             }
+        {/* Panel 2: Chat (AI Interaction) */}
+        <ResizablePanel defaultSize={showPreview ? 40 : 82} minSize={30} className="transition-all duration-500 ease-in-out">
+          <ChatInterface />
+        </ResizablePanel>
 
-             // Fetch projects in background
-             try {
-                const res = await fetch('/api/projects/list');
-                if (res.ok && mounted) {
-                    const json = await res.json();
-                    const list = json.projects || [];
-                    const localActive = useProjectStore.getState().activeProjectId;
-                    if (list.length > 0 && !useProjectStore.getState().projectName && !localActive) {
-                        useProjectStore.getState().setProjectDetails(list[0].repo_name, `https://github.com/${list[0].repo_name}`);
-                    }
-                }
-             } catch (e) { console.error("Project fetch error", e); }
-        }
-    };
+        {showPreview && (
+          <>
+            <ResizableHandle className="bg-white/5 hover:bg-indigo-500/50 transition-colors w-[1px]" />
 
-    initDashboard();
-    
-    return () => { mounted = false; };
-  }, [router]); // Minimized dependencies to prevent re-loops
+            {/* Panel 3: Preview (Live App) - Smartly Hidden */}
+            <ResizablePanel defaultSize={42} minSize={30}>
+              <PreviewPanel files={generatedFiles} />
+            </ResizablePanel>
+          </>
+        )}
 
-  if (isLoading) {
-      return <DashboardSkeleton />;
-  }
-
-  // If no project is active, show Empty State
-  if (!projectName) {
-      return <EmptyState />;
-  }
-
-  // Render the new Split View Editor
-  return <SplitView key={projectName} />;
+      </ResizablePanelGroup>
+      
+      <ConsoleOverlay />
+    </div>
+  );
 }

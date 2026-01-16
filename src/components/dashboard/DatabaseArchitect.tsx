@@ -51,8 +51,6 @@ export function DatabaseArchitect() {
             body: JSON.stringify({ prompt: input }),
         });
         
-        if (!response.ok) throw new Error("API request failed");
-
         const data = await response.json();
         
         if (data.sql) {
@@ -75,7 +73,6 @@ export function DatabaseArchitect() {
         }
     } catch (error) {
         // Silently fail or show toast
-        console.error("Architect error:", error);
     } finally {
         setIsGenerating(false);
     }

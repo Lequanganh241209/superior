@@ -1,3 +1,0 @@
-Deployment Trigger: 2026-01-13
-Fix: Circular Dependency Resolution
-Status: Critical Patch

@@ -9,6 +9,11 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Electrolize', 'sans-serif'],
+        mono: ['Share Tech Mono', 'monospace'],
+        heading: ['Audiowide', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

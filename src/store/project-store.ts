@@ -20,7 +20,19 @@ export interface Project {
 }
 
 interface ProjectState {
-  isInitializing: boolean;
+  // Generation State
+  isGenerating: boolean;
+  generationProgress: number;
+  generationStep: string;
+  generationErrors: string[];
+  
+  // Chat State
+  messages: Array<{ id: string; role: 'user' | 'assistant' | 'system'; content: string; timestamp: number }>;
+
+  // Actions
+  setGenerating: (isGenerating: boolean) => void;
+  setGenerationStatus: (progress: number, step: string) => void;
+  addMessage: (role: 'user' | 'assistant' | 'system', content: string) => void;
   
   // Project Management
   projects: Project[];
@@ -37,17 +49,7 @@ interface ProjectState {
   generatedSQL: string | null;
   generatedFiles: any[];
 
-  // Aether Architect State (Wizard)
-  wizardStep: number;
-  wizardStatus: string;
-  wizardLogs: string[];
-  
   // Actions
-  setWizardStep: (step: number) => void;
-  setWizardStatus: (status: string) => void;
-  addWizardLog: (log: string) => void;
-  clearWizardLogs: () => void;
-  
   setInitializing: (status: boolean) => void;
   setProjectDetails: (name: string, repoUrl: string) => void;
   setPreviewUrl: (url: string | null) => void;
@@ -58,6 +60,10 @@ interface ProjectState {
   setGeneratedSQL: (sql: string | null) => void;
   setGeneratedFiles: (files: any[]) => void;
   
+  // Vision / Visual Update State
+  visualUpdatePrompt: string | null;
+  setVisualUpdatePrompt: (prompt: string | null) => void;
+
   // Project Actions
   createProject: (name: string, prompt: string) => string;
   updateProjectFiles: (id: string, files: any[]) => void;
@@ -69,6 +75,12 @@ export const useProjectStore = create<ProjectState>()(
   persist(
     (set, get) => ({
       isInitializing: false,
+      isGenerating: false,
+      generationProgress: 0,
+      generationStep: 'Ready',
+      generationErrors: [],
+      messages: [],
+      
       projects: [],
       activeProjectId: null,
 
@@ -81,18 +93,15 @@ export const useProjectStore = create<ProjectState>()(
       workflow: { nodes: [], edges: [] },
       generatedSQL: null,
       generatedFiles: [],
-      
-      // Wizard Init
-      wizardStep: 0,
-      wizardStatus: "Idle",
-      wizardLogs: [],
-
-      setWizardStep: (step) => set({ wizardStep: step }),
-      setWizardStatus: (status) => set({ wizardStatus: status }),
-      addWizardLog: (log) => set(state => ({ wizardLogs: [...state.wizardLogs, log] })),
-      clearWizardLogs: () => set({ wizardLogs: [] }),
+      visualUpdatePrompt: null,
 
       setInitializing: (status) => set({ isInitializing: status }),
+      setGenerating: (status) => set({ isGenerating: status }),
+      setGenerationStatus: (progress, step) => set({ generationProgress: progress, generationStep: step }),
+      addMessage: (role, content) => set(state => ({ 
+        messages: [...state.messages, { id: Date.now().toString(), role, content, timestamp: Date.now() }] 
+      })),
+
       setProjectDetails: (name, repoUrl) => set({ projectName: name, repoUrl: repoUrl }),
       setPreviewUrl: (url) => {
         set({ previewUrl: url });
@@ -111,7 +120,12 @@ export const useProjectStore = create<ProjectState>()(
       setWorkflow: (graph) => set({ workflow: graph }),
       setGeneratedSQL: (sql) => set({ generatedSQL: sql }),
       setGeneratedFiles: (files) => {
+        // Ensure files are not empty and have content
+        if (!files || files.length === 0) return;
+        
+        console.log("Store: Updating generated files", files.length);
         set({ generatedFiles: files });
+        
         // Update active project if exists
         const { activeProjectId, projects } = get();
         if (activeProjectId) {
@@ -121,16 +135,10 @@ export const useProjectStore = create<ProjectState>()(
             set({ projects: updatedProjects });
         }
       },
+      setVisualUpdatePrompt: (prompt) => set({ visualUpdatePrompt: prompt }),
 
       createProject: (name, prompt) => {
-        // Safe UUID generator that works in all environments
-        const id = typeof crypto !== 'undefined' && crypto.randomUUID 
-            ? crypto.randomUUID() 
-            : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-            
+        const id = crypto.randomUUID();
         const newProject: Project = {
             id,
             name,
@@ -185,17 +193,7 @@ export const useProjectStore = create<ProjectState>()(
     {
       name: 'superior-storage', // name of the item in the storage (must be unique)
       storage: createJSONStorage(() => localStorage), // (optional) by default, 'localStorage' is used
-      partialize: (state) => ({ 
-        projects: state.projects, 
-        activeProjectId: state.activeProjectId,
-        // Persist Wizard State
-        wizardStep: state.wizardStep,
-        wizardStatus: state.wizardStatus,
-        wizardLogs: state.wizardLogs,
-        isInitializing: state.isInitializing,
-        projectName: state.projectName,
-        autoBuildPrompt: state.autoBuildPrompt
-      }),
+      partialize: (state) => ({ projects: state.projects, activeProjectId: state.activeProjectId }), // Only persist projects and active ID
     }
   )
 );
